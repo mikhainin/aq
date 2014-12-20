@@ -8,13 +8,15 @@
 
 #include <iostream>
 
-#include "avroreader.h"
+#include "avro/reader.h"
 
 int main(int argc, const char * argv[]) {
     
-    AvroReader reader;
+    avro::Reader reader(argv[1]);
     
-    reader.readFile(argv[1]);
+    avro::header header = reader.readHeader();
     
+    reader.readBlock(header);
+
     return 0;
 }
