@@ -8,17 +8,19 @@
 
 #include <cstdint>
 #include <cstring>
-
 #include <fstream>
 #include <stdexcept>
-
 #include <iostream>
+
+#include <boost/scoped_ptr.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+
+#include "reader.h"
 
 namespace {
 const std::string AVRO_MAGICK = "Obj\001"; // 4 bytes
 }
-
-#include "reader.h"
 
 namespace avro {
 
@@ -65,38 +67,93 @@ header Reader::readHeader() {
 
     }
 
+    char c;
+    d->input.read(&c, 1);
+
     d->input.read(&header.sync[0], sizeof header.sync);
 
     return header;
 
 }
 
+boost::iostreams::zlib_params get_zlib_params();
+
+class my_input_filter : public boost::iostreams::multichar_input_filter {
+public:
+    template<typename Source>
+    std::streamsize read(Source &, char* s, std::streamsize n)
+    {
+        if (bytesLeft == 0) {
+            return -1;
+        }
+
+        std::streamsize bytesRead = -1; // EOF;
+
+        if (bytesLeft >= n) {
+
+            bytesRead = boost::iostreams::read(source, s, n);
+
+        } else if (bytesLeft < n) {
+            bytesRead = boost::iostreams::read(source, s, bytesLeft);
+        }
+
+        if (bytesRead > 0) {
+            bytesLeft -= bytesRead;
+        }
+
+        return bytesRead;
+    }
+
+    my_input_filter(std::ifstream &source, std::streamsize bytesLeft) :
+        boost::iostreams::multichar_input_filter(), source(source), bytesLeft(bytesLeft) {
+    }
+
+private:
+    std::ifstream &source;
+    std::streamsize bytesLeft = 0;
+};
 
 void Reader::readBlock(const header &header) {
 
-    int64_t blockStart = d->input.tellg();
 
     int64_t objectCountInBlock = readLong();
     int64_t blockBytesNum = readLong();
 
-    int64_t blockHeaderLen = d->input.tellg() - blockStart;
 
-    std::cout << objectCountInBlock << std::endl;
-    std::cout << blockBytesNum << std::endl;
+    std::cout << "block objects count: " << objectCountInBlock << std::endl;
+    std::cout << "block length: " << blockBytesNum << std::endl;
 
-    d->input.seekg(blockBytesNum - blockHeaderLen - 16, std::ios_base::cur); // TODO: move to a function
+    if (header.metadata.at("avro.codec") == "deflate") { // TODO: check it once
 
-    char tmp_sync[16] = {0}; // TODO sync length to a constant
-    d->input.read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
+        std::unique_ptr<boost::iostreams::filtering_istream> deflate_stream(new boost::iostreams::filtering_istream());
 
-    if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
-        throw std::runtime_error("Sync match failed");
+        deflate_stream->push(boost::iostreams::zlib_decompressor(get_zlib_params()));
+
+        deflate_stream->push(my_input_filter(d->input, blockBytesNum));
+
+        int i = 0;
+        while(*deflate_stream) {
+            i++;
+            char c;
+            deflate_stream->read(&c, 1);
+        }
+
+        deflate_stream->seekg(0, std::ios_base::end);
+        // std::cout << "compressed size: " << i /*<< " buf size: " << compressed_.size()*/ << std::endl;
+
+        char tmp_sync[16] = {0}; // TODO sync length to a constant
+        d->input.read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
+
+        if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
+            throw std::runtime_error("Sync match failed");
+        }
     }
+    std::cout << std::endl;
 
 }
 
 bool Reader::eof() {
-    return d->input;
+    return d->input.eof();
 }
 
 // TODO: rewrite it
@@ -107,6 +164,9 @@ int64_t Reader::readLong() {
     uint8_t u;
     do {
         if (shift >= 64) {
+            if (d->input.eof()) {
+                throw Eof();
+            }
             throw std::runtime_error("Invalid Avro varint");
         }
         u = static_cast<uint8_t>(d->input.get());
@@ -131,6 +191,15 @@ std::string Reader::readString() {
     
     return result;
 }
+
+
+boost::iostreams::zlib_params get_zlib_params() {
+  boost::iostreams::zlib_params result;
+  result.method = boost::iostreams::zlib::deflated;
+  result.noheader = true;
+  return result;
+}
+
 
 }
 

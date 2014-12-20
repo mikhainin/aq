@@ -23,6 +23,8 @@ struct header {
 class Reader {
 public:
 
+    class Eof {};
+
     Reader(const std::string & filename);
     ~Reader();
 

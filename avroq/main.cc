@@ -16,7 +16,13 @@ int main(int argc, const char * argv[]) {
     
     avro::header header = reader.readHeader();
     
-    reader.readBlock(header);
+    try {
+        while (not reader.eof()) {
+            reader.readBlock(header);
+        }
+    } catch (const avro::Reader::Eof &e) {
+        ; // reading done
+    }
 
     return 0;
 }

@@ -8,4 +8,4 @@ add_subdirectory (avro)
 
 add_executable(avroq main.cc)
 
-target_link_libraries (avroq avro)
+target_link_libraries (avroq avro boost_iostreams)
