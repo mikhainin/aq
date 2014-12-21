@@ -16,6 +16,7 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 
+#include "schemareader.h"
 #include "reader.h"
 
 namespace {
@@ -67,6 +68,7 @@ header Reader::readHeader() {
 
     }
 
+    SchemaReader schemaReader(header.metadata["avro.schema"]);
     char c;
     d->input.read(&c, 1);
 
@@ -115,6 +117,7 @@ private:
 
 void Reader::readBlock(const header &header) {
 
+    throw Eof();
 
     int64_t objectCountInBlock = readLong();
     int64_t blockBytesNum = readLong();
@@ -147,6 +150,8 @@ void Reader::readBlock(const header &header) {
         if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
             throw std::runtime_error("Sync match failed");
         }
+    } else {
+        throw std::runtime_error("Unknown codec: " + header.metadata.at("avro.codec"));
     }
     std::cout << std::endl;
 

@@ -15,12 +15,21 @@
 
 namespace avro {
 
+class SchemaNode {
+public:
+    virtual ~SchemaNode() {}
+};
+
 SchemaReader::SchemaReader(const std::string &schemaJson) {
 
     std::stringstream ss(schemaJson);
 
     boost::property_tree::ptree pt;
     boost::property_tree::read_json(ss, pt);
+
+    auto &i = pt.front();
+
+    std::cout << i.first << ": " << i.second.data() << std::endl;
 
 }
 
