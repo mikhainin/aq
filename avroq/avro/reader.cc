@@ -12,7 +12,6 @@
 #include <stdexcept>
 #include <iostream>
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 
