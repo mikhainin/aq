@@ -19,6 +19,28 @@ class SchemaNode {
 public:
     virtual ~SchemaNode() {}
 };
+    
+struct NodeDescriptor {
+    std::string type;
+    std::string name;
+    bool containsFields = false;
+    boost::property_tree::ptree node;
+    
+    NodeDescriptor(boost::property_tree::ptree node) : node(node){
+    }
+    
+    void assignField(const std::string &name, const std::string &value) {
+        if (name == "type") {
+            type = value;
+        } else if (name == "name") {
+            this->name = value;
+        } else if (name == "fields") {
+            containsFields = true;
+        } else {
+            throw std::runtime_error("NodeDescriptor::assignField: unknown schema record name - " + name);
+        }
+    }
+};
 
 SchemaReader::SchemaReader(const std::string &schemaJson) {
 
@@ -29,6 +51,7 @@ SchemaReader::SchemaReader(const std::string &schemaJson) {
 
     auto &i = pt.front();
 
+    NodeDescriptor descriptor(i);
     std::cout << i.first << ": " << i.second.data() << std::endl;
 
 }
