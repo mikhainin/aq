@@ -71,6 +71,7 @@ header Reader::readHeader() {
     char c;
     d->input.read(&c, 1);
 
+    assert(c == 0); // TODO: what is it?
     d->input.read(&header.sync[0], sizeof header.sync);
 
     return header;

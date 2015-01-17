@@ -8,7 +8,6 @@ else()
     message( FATAL_ERROR "Unable to find Boost libraries")
 endif()
 
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -pedantic -Wall -Werror")
 
 # include_directories ("${PROJECT_SOURCE_DIR}/avro")
