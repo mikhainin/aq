@@ -12,23 +12,19 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
+#include "schemanode.h"
 
 #include "schemareader.h"
 
 namespace avro {
 
-class SchemaNode {
-public:
-    virtual ~SchemaNode() {}
-};
-    
 struct NodeDescriptor {
     std::string type;
     std::string name;
     bool containsFields = false;
     boost::property_tree::ptree node;
 
-    NodeDescriptor(boost::property_tree::ptree node) : node(node){
+    NodeDescriptor(const boost::property_tree::ptree &node) : node(node){
     }
     
     void assignField(const std::string &name, const std::string &value) {
@@ -44,23 +40,42 @@ struct NodeDescriptor {
     }
 };
 
-class Record : public SchemaNode {
+class RecordNode : public SchemaNode {
 public:
-    Record(const NodeDescriptor &descriptor);
+    RecordNode(const NodeDescriptor &descriptor);
+
+    void addChild(std::unique_ptr<SchemaNode> &&newChild);
 private:
-    const std::string &name;
     std::vector<std::unique_ptr<SchemaNode> > children;
 };
-Record::Record(const NodeDescriptor &descriptor)
-    : name(descriptor.name) {
 
+RecordNode::RecordNode(const NodeDescriptor &descriptor)
+    : SchemaNode(descriptor.name) {
+}
+
+void RecordNode::addChild(std::unique_ptr<SchemaNode> &&newChild) {
+    children.push_back(std::move(newChild));
+}
+
+class StringNode : public SchemaNode {
+public:
+    StringNode(const NodeDescriptor &descriptor);
+
+private:
+};
+
+StringNode::StringNode(const NodeDescriptor &descriptor)
+    : SchemaNode(descriptor.name) {
 }
 
 
 // TODO: move to member
 static std::unique_ptr<SchemaNode> NodeByName(const NodeDescriptor &descriptor) {
+    std::cout << descriptor.type << std::endl;
     if (descriptor.type == "record") {
-        return std::unique_ptr<SchemaNode>(new Record(descriptor));
+        return std::unique_ptr<SchemaNode>(new RecordNode(descriptor));
+    } else if (descriptor.type == "string") {
+        return std::unique_ptr<SchemaNode>(new StringNode(descriptor));
     }
     throw std::runtime_error("unknown node type: " + descriptor.type);
 }
@@ -71,29 +86,30 @@ SchemaReader::SchemaReader(const std::string &schemaJson) : schemaJson(schemaJso
 SchemaReader::~SchemaReader() {
 }
 
-void SchemaReader::parse() {
+std::unique_ptr<SchemaNode> SchemaReader::parse() {
     std::stringstream ss(schemaJson);
 
     boost::property_tree::ptree pt;
     boost::property_tree::read_json(ss, pt);
 
-    // std::cout << "type: " << pt.get<std::string>("type") << std::endl;
-/*
-    for(const auto &p : pt) {
-        NodeDescriptor descriptor(p);
-        std::cout << p.first << ": " << p.second.data() << std::endl;
-        // auto newNode = NodeByName(descriptor);
-    }*/
+    return parseOneJsonObject(pt);
+}
 
-    auto descriptor = parseOneJsonObject(pt);
+std::unique_ptr<SchemaNode> SchemaReader::parseOneJsonObject(const boost::property_tree::ptree &node) {
+
+    auto descriptor = descriptorForJsonObject(node);
+
     auto newNode = NodeByName(*descriptor);
 
     if (descriptor->containsFields) {
-        readRecordFields(pt, dynamic_cast<Record &>(*newNode));
+        readRecordFields(node, dynamic_cast<RecordNode &>(*newNode));
     }
+
+    return newNode;
+
 }
 
-std::unique_ptr<NodeDescriptor> SchemaReader::parseOneJsonObject(boost::property_tree::ptree &node) {
+std::unique_ptr<NodeDescriptor> SchemaReader::descriptorForJsonObject(const boost::property_tree::ptree &node) {
 
     std::unique_ptr<NodeDescriptor> descriptor(new NodeDescriptor(node));
 
@@ -106,9 +122,19 @@ std::unique_ptr<NodeDescriptor> SchemaReader::parseOneJsonObject(boost::property
 
 }
 
-void SchemaReader::readRecordFields(boost::property_tree::ptree &node, Record &record) {
+void SchemaReader::readRecordFields(const boost::property_tree::ptree &node, RecordNode &record) {
     for(const auto &p : node.get_child("fields")) {
-        parseOneJsonObject(p.second.get_child());
+
+        auto newNode = parseOneJsonObject(p.second);
+/*
+
+        if (newNode->is<Record>()) {
+        // if (descriptor->containsFields) {
+            readRecordFields(p.second, dynamic_cast<Record &>(*newNode));
+        }
+*/
+
+        record.addChild(std::move(newNode));
     }
 }
 

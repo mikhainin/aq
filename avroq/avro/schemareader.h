@@ -21,20 +21,22 @@ namespace boost {
 namespace avro {
 
 class NodeDescriptor;
-class Record;
+class RecordNode;
+class SchemaNode;
 
 class SchemaReader {
 public:
     SchemaReader(const std::string &schemaJson);
     virtual ~SchemaReader();
 
-    void parse();
+    std::unique_ptr<SchemaNode> parse();
 private:
     const std::string &schemaJson;
 
-    std::unique_ptr<NodeDescriptor> parseOneJsonObject(boost::property_tree::ptree &node);
+    std::unique_ptr<SchemaNode> parseOneJsonObject(const boost::property_tree::ptree &node);
+    std::unique_ptr<NodeDescriptor> descriptorForJsonObject(const boost::property_tree::ptree &node);
 
-    void readRecordFields(boost::property_tree::ptree &node, Record &record);
+    void readRecordFields(const boost::property_tree::ptree &node, RecordNode &record);
 };
 
 } /* namespace avro */

@@ -16,6 +16,7 @@
 #include <boost/iostreams/filter/zlib.hpp>
 
 #include "schemareader.h"
+#include "schemanode.h"
 #include "reader.h"
 
 namespace {
@@ -68,6 +69,8 @@ header Reader::readHeader() {
     }
 
     SchemaReader schemaReader(header.metadata["avro.schema"]);
+    schemaReader.parse();
+
     char c;
     d->input.read(&c, 1);
 
