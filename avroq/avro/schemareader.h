@@ -10,19 +10,13 @@
 
 #include <boost/property_tree/ptree.hpp>
 
-/*
-namespace boost {
-    namespace property_tree {
-        class ptree; //::value_type
-    }
-}
-*/
-
 namespace avro {
 
 class NodeDescriptor;
 class RecordNode;
 class SchemaNode;
+class CustomType;
+class EnumNode;
 
 class SchemaReader {
 public:
@@ -37,6 +31,9 @@ private:
     std::unique_ptr<NodeDescriptor> descriptorForJsonObject(const boost::property_tree::ptree &node);
 
     void readRecordFields(const boost::property_tree::ptree &node, RecordNode &record);
+    void readRecordDefinition(const boost::property_tree::ptree &node, CustomType &record);
+    std::unique_ptr<EnumNode> readEnum(const boost::property_tree::ptree &node);
+    std::unique_ptr<SchemaNode> nodeByType(const boost::property_tree::ptree  &node);
 };
 
 } /* namespace avro */
