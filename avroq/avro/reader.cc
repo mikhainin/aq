@@ -16,7 +16,17 @@
 #include <boost/iostreams/filter/zlib.hpp>
 
 #include "schemareader.h"
-#include "schemanode.h"
+#include "node/schemanode.h"
+#include "node/record.h"
+#include "node/union.h"
+#include "node/string.h"
+#include "node/custom.h"
+#include "node/int.h"
+#include "node/boolean.h"
+#include "node/float.h"
+#include "node/double.h"
+#include "node/null.h"
+
 #include "reader.h"
 
 namespace {
@@ -29,6 +39,7 @@ class Reader::Private {
 public:
     std::string filename;
     std::ifstream input;
+    std::vector<uint8_t> read;
 };
 
 Reader::Reader(const std::string& filename) :
@@ -57,20 +68,22 @@ header Reader::readHeader() {
     header header;
 
 
-    int64_t recordsNumber = readLong();
+    int64_t recordsNumber = readLong(d->input);
     
     for(uint i = 0; i < recordsNumber; ++i) {
 
-        const std::string &key = readString();
-        const std::string &value = readString();
+        const std::string &key = readString(d->input);
+        const std::string &value = readString(d->input);
 
         header.metadata[key] = value;
 
     }
 
     SchemaReader schemaReader(header.metadata["avro.schema"]);
-    schemaReader.parse();
+    header.schema = schemaReader.parse();
 
+    //dumpShema(schemaRoot);
+    
     char c;
     d->input.read(&c, 1);
 
@@ -120,14 +133,14 @@ private:
 
 void Reader::readBlock(const header &header) {
 
-    throw Eof();
+    // throw Eof();
 
-    int64_t objectCountInBlock = readLong();
-    int64_t blockBytesNum = readLong();
+    int64_t objectCountInBlock = readLong(d->input);
+    int64_t blockBytesNum = readLong(d->input);
 
 
-    std::cout << "block objects count: " << objectCountInBlock << std::endl;
-    std::cout << "block length: " << blockBytesNum << std::endl;
+    // std::cout << "block objects count: " << objectCountInBlock << std::endl;
+    // std::cout << "block length: " << blockBytesNum << std::endl;
 
     if (header.metadata.at("avro.codec") == "deflate") { // TODO: check it once
 
@@ -137,11 +150,15 @@ void Reader::readBlock(const header &header) {
 
         deflate_stream->push(my_input_filter(d->input, blockBytesNum));
 
-        int i = 0;
-        while(*deflate_stream) {
+        // int i = 0;
+        /*while(*deflate_stream) {
             i++;
             char c;
             deflate_stream->read(&c, 1);
+        }
+        */
+        for(int i = 0; i < objectCountInBlock; ++i) {
+            decodeBlock(*deflate_stream, header.schema);
         }
 
         deflate_stream->seekg(0, std::ios_base::end);
@@ -153,33 +170,140 @@ void Reader::readBlock(const header &header) {
         if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
             throw std::runtime_error("Sync match failed");
         }
+        
     } else {
         throw std::runtime_error("Unknown codec: " + header.metadata.at("avro.codec"));
     }
-    std::cout << std::endl;
+    // std::cout << std::endl;
 
+}
+
+void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<SchemaNode> &schema, int level) {
+    if (schema->is<node::Record>()) {
+        /*
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << schema->getItemName() << " {\n";*/
+        for(auto &p : schema->as<node::Record>().getChildren()) {
+            decodeBlock(stream, p, level + 1);
+        }
+        /*for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << "}\n";*/
+    } else if (schema->is<node::Union>()) {
+        /*for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }*/
+        int item = readLong(stream);
+        const auto &node = schema->as<node::Union>().getChildren()[item];
+        // std::cout << "union " << node->getItemName() << ": " << node->getTypeName() << std::endl;
+        decodeBlock(stream, node, level + 1);
+    } else if (schema->is<node::Custom>()) {
+        /*for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;*/
+        decodeBlock(stream, schema->as<node::Custom>().getDefinition(), level + 1);
+    } else {
+        /*for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }*/
+        if (schema->is<node::String>()) {
+            //
+            readString(stream);
+            // std::cout << schema->getItemName() << ": \"" << readString(stream)  << '"' << std::endl;
+        } else if (schema->is<node::Int>()) {
+            readLong(stream);
+            // std::cout << schema->getItemName() << ": " << readLong(stream) << std::endl;
+        } else if (schema->is<node::Float>()) {
+            readFloat(stream);
+            // std::cout << schema->getItemName() << ": " << readFloat(stream) << std::endl;
+        } else if (schema->is<node::Double>()) {
+            readDouble(stream);
+            // std::cout << schema->getItemName() << ": " << readDouble(stream) << std::endl;
+        } else if (schema->is<node::Boolean>()) {
+            readBoolean(stream);
+            // std::cout << schema->getItemName() << ": " << readBoolean(stream) << std::endl;
+        } else if (schema->is<node::Null>()) {
+            // std::cout << schema->getItemName() << ": null" << std::endl;
+        } else {
+            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+            std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+            throw Eof();
+        }
+        /*static int counter = 0;
+        if (counter++ == 70) {
+            throw Eof();
+        }*/
+    }
 }
 
 bool Reader::eof() {
     return d->input.eof();
 }
 
+
+void Reader::dumpShema(const std::unique_ptr<SchemaNode> &schema, int level) const {
+    if (schema->is<node::Record>()) {
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << schema->getItemName() << " {\n";
+        for(auto &p : schema->as<node::Record>().getChildren()) {
+            dumpShema(p, level + 1);
+        }
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << "}\n";
+    } else if (schema->is<node::Union>()) {
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << schema->getItemName() << ":[\n";
+        for(auto &p : schema->as<node::Union>().getChildren()) {
+            dumpShema(p, level + 1);
+        }
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << "]\n";
+    } else if (schema->is<node::Custom>()) {
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+        dumpShema(schema->as<node::Custom>().getDefinition(), level + 1);
+    } else {
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        // std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+    }
+}
+
 // TODO: rewrite it
 int64_t decodeZigzag64(uint64_t input);
-int64_t Reader::readLong() {
+int64_t Reader::readLong(std::istream &input) {
     uint64_t encoded = 0;
     int shift = 0;
     uint8_t u;
     do {
         if (shift >= 64) {
-            if (d->input.eof()) {
+            if (input.eof()) {
                 throw Eof();
             }
             throw std::runtime_error("Invalid Avro varint");
         }
-        u = static_cast<uint8_t>(d->input.get());
+        u = static_cast<uint8_t>(input.get());
         encoded |= static_cast<uint64_t>(u & 0x7f) << shift;
         shift += 7;
+
+        d->read.push_back(u);
+
+
     } while (u & 0x80);
     
     return decodeZigzag64(encoded);
@@ -191,15 +315,50 @@ decodeZigzag64(uint64_t input)
     return static_cast<int64_t>(((input >> 1) ^ -(static_cast<int64_t>(input) & 1)));
 }
 
-std::string Reader::readString() {
-    int64_t len = readLong();
+std::string Reader::readString(std::istream &input) {
+    int64_t len = readLong(input);
     std::string result;
     result.resize(len);
-    d->input.read(&result[0], result.size());
-    
+    input.read(&result[0], result.size());
+
+    for(char c : result) {
+        d->read.push_back(static_cast<uint8_t>(c));
+    }
     return result;
 }
 
+float Reader::readFloat(std::istream &input) {
+    static_assert(sizeof(float) == 4, "sizeof(float) should be == 4");
+
+    union {
+        uint8_t bytes[4];
+        float result;
+    } buffer;
+
+    input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
+
+    return buffer.result;
+}
+
+double Reader::readDouble(std::istream &input) {
+    static_assert(sizeof(double) == 8, "sizeof(double) should be == 8");
+
+    union {
+        uint8_t bytes[8];
+        double result;
+    } buffer;
+
+    input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
+
+    return buffer.result;
+}
+
+bool Reader::readBoolean(std::istream &input) {
+    uint8_t c;
+    input.read(reinterpret_cast<char *>(&c), sizeof c);
+
+    return c == 1;
+}
 
 boost::iostreams::zlib_params get_zlib_params() {
   boost::iostreams::zlib_params result;

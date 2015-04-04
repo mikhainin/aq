@@ -13,10 +13,15 @@
 #include <cstdint>
 #include <map>
 
+#include <boost/iostreams/filtering_stream.hpp>
+
 namespace avro {
+
+class SchemaNode;
 
 struct header {
     std::map<std::string, std::string> metadata;
+    std::unique_ptr<SchemaNode> schema;
     char sync[16] = {0}; // TODO sync length to a constant
 };
 
@@ -38,8 +43,14 @@ private:
     class Private;
     Private *d = nullptr;
 
-    int64_t readLong();
-    std::string readString();
+    int64_t readLong(std::istream &input);
+    std::string readString(std::istream &input);
+    float readFloat(std::istream &input);
+    double readDouble(std::istream &input);
+    bool readBoolean(std::istream &input);
+
+    void dumpShema(const std::unique_ptr<SchemaNode> &schema, int level = 0) const;
+    void decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<SchemaNode> &schema, int level = 0);
 };
 
 }

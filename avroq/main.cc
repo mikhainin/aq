@@ -9,6 +9,8 @@
 #include <iostream>
 
 #include "avro/reader.h"
+// TODO: remove this include from this file
+#include "avro/node/schemanode.h"
 
 int main(int argc, const char * argv[]) {
     

@@ -12,11 +12,13 @@
 
 namespace avro {
 
+namespace node {
+    class Record;
+    class Union;
+    class Custom;
+}
 class NodeDescriptor;
-class RecordNode;
 class SchemaNode;
-class CustomType;
-class EnumNode;
 
 class SchemaReader {
 public:
@@ -24,16 +26,20 @@ public:
     virtual ~SchemaReader();
 
     std::unique_ptr<SchemaNode> parse();
+
+    void dumpSchema(std::unique_ptr<SchemaNode> schema, std::ostream &to);
 private:
     const std::string &schemaJson;
 
     std::unique_ptr<SchemaNode> parseOneJsonObject(const boost::property_tree::ptree &node);
     std::unique_ptr<NodeDescriptor> descriptorForJsonObject(const boost::property_tree::ptree &node);
 
-    void readRecordFields(const boost::property_tree::ptree &node, RecordNode &record);
-    void readRecordDefinition(const boost::property_tree::ptree &node, CustomType &record);
-    std::unique_ptr<EnumNode> readEnum(const boost::property_tree::ptree &node);
-    std::unique_ptr<SchemaNode> nodeByType(const boost::property_tree::ptree  &node);
+    void readRecordFields(const boost::property_tree::ptree &node, node::Record &record);
+    void readRecordDefinition(const boost::property_tree::ptree &node, node::Custom &record);
+    std::unique_ptr<node::Union> readUnion(const boost::property_tree::ptree &node, const std::string &name);
+    
+    std::unique_ptr<SchemaNode> nodeByType(const boost::property_tree::ptree &node,
+                                           const std::string &nodeName);
 };
 
 } /* namespace avro */
