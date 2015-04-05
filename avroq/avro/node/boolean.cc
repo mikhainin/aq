@@ -3,7 +3,7 @@
 namespace avro {
 namespace node {
 
-Boolean::Boolean(const std::string &name) : SchemaNode("boolean", name) {
+Boolean::Boolean(int number, const std::string &name) : Node(number, "boolean", name) {
 }
 
 }

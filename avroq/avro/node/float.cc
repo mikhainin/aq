@@ -4,7 +4,7 @@ namespace avro {
 namespace node {
 
 
-Float::Float(const std::string &name) : SchemaNode("float", name) {
+Float::Float(int number, const std::string &name) : Node(number, "float", name) {
 }
 
 

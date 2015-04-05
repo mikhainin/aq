@@ -6,15 +6,15 @@ namespace avro {
 namespace node {
 
 
-Record::Record(const std::string &name)
-: SchemaNode("record", name) {
+Record::Record(int number, const std::string &name)
+: Node(number, "record", name) {
 }
 
-void Record::addChild(std::unique_ptr<SchemaNode> &&newChild) {
+void Record::addChild(std::unique_ptr<Node> &&newChild) {
     children.push_back(std::move(newChild));
 }
 
-const std::vector<std::unique_ptr<SchemaNode> > &Record::getChildren() const {
+const std::vector<std::unique_ptr<Node> > &Record::getChildren() const {
     return children;
 }
 

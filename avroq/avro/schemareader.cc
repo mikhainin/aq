@@ -8,7 +8,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
-#include "node/schemanode.h"
+#include "node/Node.h"
 #include "node/custom.h"
 #include "node/record.h"
 #include "node/string.h"
@@ -21,7 +21,6 @@
 #include "schemareader.h"
 
 namespace avro {
-
 
 static bool isObject(const boost::property_tree::ptree &node) {
     return !node.front().first.empty() && !node.front().second.data().empty();
@@ -49,7 +48,6 @@ public:
     
     void assignField(const std::string &name, const std::string &value) {
         
-        std::cout << name << "=>'" << value << "'" <<  std::endl;
         if (name == "type" && value == "") {
             isCustomTypeDefinition = true; // type is an object (or probably array?)
         } else if (name == "type") {
@@ -65,28 +63,22 @@ public:
 };
 
 // TODO: move to member
-static std::unique_ptr<SchemaNode> NodeByTypeName(const std::string &typeName, const std::string &itemName) {
-    // std::cout << typeName << std::endl;
+std::unique_ptr<Node> SchemaReader::NodeByTypeName(const std::string &typeName, const std::string &itemName) {
     if (typeName == "record") {
-        return std::unique_ptr<SchemaNode>(new node::Record(itemName));
+        return std::unique_ptr<Node>(new node::Record(currentIndex++, itemName));
     } else if (typeName == "string") {
-        return std::unique_ptr<SchemaNode>(new node::String(itemName));
+        return std::unique_ptr<Node>(new node::String(currentIndex++, itemName));
     } else if (typeName == "int") {
-        return std::unique_ptr<SchemaNode>(new node::Int(itemName));
+        return std::unique_ptr<Node>(new node::Int(currentIndex++, itemName));
     } else if (typeName == "float") {
-        return std::unique_ptr<SchemaNode>(new node::Float(itemName));
+        return std::unique_ptr<Node>(new node::Float(currentIndex++, itemName));
     } else if (typeName == "double") {
-        return std::unique_ptr<SchemaNode>(new node::Double(itemName));
+        return std::unique_ptr<Node>(new node::Double(currentIndex++, itemName));
     } else if (typeName == "boolean") {
-        return std::unique_ptr<SchemaNode>(new node::Boolean(itemName));
+        return std::unique_ptr<Node>(new node::Boolean(currentIndex++, itemName));
     } else if (typeName == "null") {
-        return std::unique_ptr<SchemaNode>(new node::Null());
+        return std::unique_ptr<Node>(new node::Null(currentIndex++));
     }
-    /*} else if (name == "" && descriptor.isCustomTypeDefinition) {
-        // custom type
-        // TODO: register custom type
-        return std::unique_ptr<SchemaNode>(new CustomType(descriptor));
-    }*/
     throw std::runtime_error("unknown node type: '" + typeName + "' for node '" + itemName + "'");
 }
 
@@ -96,7 +88,7 @@ SchemaReader::SchemaReader(const std::string &schemaJson) : schemaJson(schemaJso
 SchemaReader::~SchemaReader() {
 }
 
-std::unique_ptr<SchemaNode> SchemaReader::parse() {
+std::unique_ptr<Node> SchemaReader::parse() {
     std::stringstream ss(schemaJson);
 
     boost::property_tree::ptree pt;
@@ -105,40 +97,33 @@ std::unique_ptr<SchemaNode> SchemaReader::parse() {
     return parseOneJsonObject(pt);
 }
 
-std::unique_ptr<SchemaNode> SchemaReader::parseOneJsonObject(const boost::property_tree::ptree &node) {
+std::unique_ptr<Node> SchemaReader::parseOneJsonObject(const boost::property_tree::ptree &node) {
 
     auto descriptor = descriptorForJsonObject(node);
 
-    std::unique_ptr<SchemaNode> newNode = nodeByType(node.get_child("type"), descriptor->name);
+    std::unique_ptr<Node> newNode = nodeByType(node.get_child("type"), descriptor->name);
 
     if (newNode->is<node::Record>()) {
         readRecordFields(node, dynamic_cast<node::Record &>(*newNode));
     } else if (newNode->is<node::Custom>()) {
-        std::cout << "set def " << newNode->getTypeName() << std::endl  ;
         newNode->as<node::Custom>().setDefinition(parseOneJsonObject(node.get_child("type")));
-        std::cout << "def for " <<  newNode->getTypeName() << " = " << newNode->as<node::Custom>().getDefinition()->getItemName() << std::endl;
     } else if (newNode->is<node::Union>()) {
         newNode = readUnion(node.get_child("type"), descriptor->name);
-    } else {
-        // return NodeByTypeName(type.data(), nodeName);
-        // throw std::runtime_error("can't determine type for node '" + descriptor->name + "':'" + descriptor->type + "'");
     }
 
     return newNode;
 
 }
 
-std::unique_ptr<SchemaNode> SchemaReader::nodeByType(const boost::property_tree::ptree &type,
+std::unique_ptr<Node> SchemaReader::nodeByType(const boost::property_tree::ptree &type,
                                                      const std::string &nodeName) {
     if (isValue(type)) {
         return NodeByTypeName(type.data(), nodeName);
     } else if(isObject(type)) {
-        return std::unique_ptr<SchemaNode>(new node::Custom(nodeName)); // parseEnum()->name
-        // record.setDefinition(parseOneJsonObject(pt));
+        return std::unique_ptr<Node>(new node::Custom(currentIndex++, nodeName)); // parseEnum()->name
     } else if (isArray(type)) {
-        return std::unique_ptr<SchemaNode>(new node::Union(nodeName));
+        return std::unique_ptr<Node>(new node::Union(currentIndex++, nodeName));
     } else {
-        // std::cout << pt.front().first << ":" << pt.front().second.data() << std::endl;
         throw std::runtime_error("smth wrong with 'type' for node '" + nodeName + "'");
     }
 }
@@ -163,16 +148,16 @@ void SchemaReader::readRecordFields(const boost::property_tree::ptree &node, nod
 }
 
 std::unique_ptr<node::Union> SchemaReader::readUnion(const boost::property_tree::ptree &node, const std::string &name) {
-    auto enumNode = std::unique_ptr<node::Union>(new node::Union(name));
+    auto enumNode = std::unique_ptr<node::Union>(new node::Union(currentIndex++, name));
     for(auto &p : node) {
         enumNode->addChild(nodeByType(p.second, name));
-        // std::cout << p.second.data() << std::endl;
     }
     return enumNode; // TODO return good value
 }
 
-void SchemaReader::dumpSchema(std::unique_ptr<SchemaNode> schema, std::ostream &to) {
-    
+int SchemaReader::nodesNumber() const {
+    return currentIndex;
 }
+
 
 } /* namespace avro */

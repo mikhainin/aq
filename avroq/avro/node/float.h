@@ -1,14 +1,14 @@
 #ifndef __avroq__float__
 #define __avroq__float__
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class Float : public SchemaNode {
+class Float : public Node {
 public:
-    explicit Float(const std::string &name);
+    explicit Float(int number, const std::string &name);
 };
 
 }

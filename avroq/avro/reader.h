@@ -17,11 +17,12 @@
 
 namespace avro {
 
-class SchemaNode;
+class Node;
 
 struct header {
     std::map<std::string, std::string> metadata;
-    std::unique_ptr<SchemaNode> schema;
+    std::unique_ptr<Node> schema;
+    int nodesNumber = 0;
     char sync[16] = {0}; // TODO sync length to a constant
 };
 
@@ -49,8 +50,8 @@ private:
     double readDouble(std::istream &input);
     bool readBoolean(std::istream &input);
 
-    void dumpShema(const std::unique_ptr<SchemaNode> &schema, int level = 0) const;
-    void decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<SchemaNode> &schema, int level = 0);
+    void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
+    void decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<Node> &schema, int level = 0);
 };
 
 }

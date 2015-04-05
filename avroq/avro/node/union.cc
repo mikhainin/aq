@@ -6,14 +6,14 @@ namespace avro {
 namespace node {
 
 
-Union::Union(const std::string &name) : SchemaNode("union", name) {
+Union::Union(int number, const std::string &name) : Node(number, "union", name) {
 }
 
-void Union::addChild(std::unique_ptr<SchemaNode> definition) {
+void Union::addChild(std::unique_ptr<Node> definition) {
     children.emplace_back(std::move(definition));
 }
 
-const std::vector<std::unique_ptr<SchemaNode> > &Union::getChildren() const {
+const std::vector<std::unique_ptr<Node> > &Union::getChildren() const {
     return children;    
 }
 

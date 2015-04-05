@@ -2,14 +2,14 @@
 #ifndef __avroq__string__
 #define __avroq__string__
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class String : public SchemaNode {
+class String : public Node {
 public:
-    explicit String(const std::string &name);
+    explicit String(int number, const std::string &name);
 };
 }
 }

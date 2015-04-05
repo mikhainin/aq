@@ -1,14 +1,14 @@
 #ifndef __avroq__int__
 #define __avroq__int__
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class Int : public SchemaNode {
+class Int : public Node {
 public:
-    explicit Int(const std::string &name);
+    explicit Int(int number, const std::string &name);
 };
 
 }

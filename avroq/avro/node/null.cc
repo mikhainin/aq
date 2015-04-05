@@ -5,7 +5,7 @@ namespace avro {
 namespace node {
 
 
-Null::Null() : SchemaNode("null", "") { // nameless, I guess. TODO: check it
+Null::Null(int number) : Node(number, "null", "") { // nameless, I guess. TODO: check it
 }
 
 

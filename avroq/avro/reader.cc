@@ -16,7 +16,7 @@
 #include <boost/iostreams/filter/zlib.hpp>
 
 #include "schemareader.h"
-#include "node/schemanode.h"
+#include "node/node.h"
 #include "node/record.h"
 #include "node/union.h"
 #include "node/string.h"
@@ -39,7 +39,7 @@ class Reader::Private {
 public:
     std::string filename;
     std::ifstream input;
-    std::vector<uint8_t> read;
+    // std::vector<uint8_t> read; // for debug purposes
 };
 
 Reader::Reader(const std::string& filename) :
@@ -81,7 +81,7 @@ header Reader::readHeader() {
 
     SchemaReader schemaReader(header.metadata["avro.schema"]);
     header.schema = schemaReader.parse();
-
+    header.nodesNumber = schemaReader.nodesNumber();
     //dumpShema(schemaRoot);
     
     char c;
@@ -178,7 +178,19 @@ void Reader::readBlock(const header &header) {
 
 }
 
-void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<SchemaNode> &schema, int level) {
+void skipLong(std::istream &input) {
+    uint8_t u;
+    do {
+            if (input.eof()) {
+                throw Reader::Eof();
+            }
+
+        u = static_cast<uint8_t>(input.get());
+        // d->read.push_back(u);
+    } while (u & 0x80);
+}
+
+void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<Node> &schema, int level) {
     if (schema->is<node::Record>()) {
         /*
         for(int i = 0; i < level; ++i) {
@@ -215,7 +227,8 @@ void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std:
             readString(stream);
             // std::cout << schema->getItemName() << ": \"" << readString(stream)  << '"' << std::endl;
         } else if (schema->is<node::Int>()) {
-            readLong(stream);
+            skipLong(stream); //
+            // readLong(stream);
             // std::cout << schema->getItemName() << ": " << readLong(stream) << std::endl;
         } else if (schema->is<node::Float>()) {
             readFloat(stream);
@@ -245,7 +258,7 @@ bool Reader::eof() {
 }
 
 
-void Reader::dumpShema(const std::unique_ptr<SchemaNode> &schema, int level) const {
+void Reader::dumpShema(const std::unique_ptr<Node> &schema, int level) const {
     if (schema->is<node::Record>()) {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -301,7 +314,7 @@ int64_t Reader::readLong(std::istream &input) {
         encoded |= static_cast<uint64_t>(u & 0x7f) << shift;
         shift += 7;
 
-        d->read.push_back(u);
+        // d->read.push_back(u);
 
 
     } while (u & 0x80);
@@ -321,9 +334,9 @@ std::string Reader::readString(std::istream &input) {
     result.resize(len);
     input.read(&result[0], result.size());
 
-    for(char c : result) {
+    /*for(char c : result) {
         d->read.push_back(static_cast<uint8_t>(c));
-    }
+    }*/
     return result;
 }
 

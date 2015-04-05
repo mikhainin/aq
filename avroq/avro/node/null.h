@@ -1,14 +1,14 @@
 #ifndef __avroq__null__
 #define __avroq__null__
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class Null : public SchemaNode {
+class Null : public Node {
 public:
-    explicit Null();
+    explicit Null(int number);
 };
 
 }

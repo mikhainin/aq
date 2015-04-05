@@ -10,7 +10,7 @@
 
 #include "avro/reader.h"
 // TODO: remove this include from this file
-#include "avro/node/schemanode.h"
+#include "avro/node/node.h"
 
 int main(int argc, const char * argv[]) {
     

@@ -4,7 +4,7 @@
 namespace avro {
 namespace node {
 
-Double::Double(const std::string &name) : SchemaNode("double", name) {
+Double::Double(int number, const std::string &name) : Node(number, "double", name) {
 }
 
 }

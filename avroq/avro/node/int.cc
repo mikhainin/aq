@@ -11,7 +11,7 @@
 namespace avro {
 namespace node {
 
-Int::Int(const std::string &name) : SchemaNode("int", name) {
+Int::Int(int number, const std::string &name) : Node(number, "int", name) {
 }
 
 }

@@ -9,19 +9,19 @@
 #ifndef __avroq__custom__
 #define __avroq__custom__
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class Custom : public SchemaNode {
+class Custom : public Node {
 public:
-    explicit Custom(const std::string &typeName);
+    explicit Custom(int number, const std::string &typeName);
 
-    void setDefinition(std::unique_ptr<SchemaNode> &&definition);
-    const std::unique_ptr<SchemaNode> &getDefinition() const;
+    void setDefinition(std::unique_ptr<Node> &&definition);
+    const std::unique_ptr<Node> &getDefinition() const;
 private:
-    std::unique_ptr<SchemaNode> definition;
+    std::unique_ptr<Node> definition;
 };
 
 }

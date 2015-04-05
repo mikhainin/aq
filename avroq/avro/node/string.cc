@@ -4,8 +4,8 @@
 namespace avro {
 namespace node {
 
-String::String(const std::string &name)
-    : SchemaNode("string", name) {
+String::String(int number, const std::string &name)
+    : Node(number, "string", name) {
 }
 
 

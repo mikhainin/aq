@@ -4,21 +4,21 @@
 #include <vector>
 #include <memory>
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
 
-class Record : public SchemaNode {
+class Record : public Node {
 public:
-    explicit Record(const std::string &name);
+    explicit Record(int number, const std::string &name);
 
-    void addChild(std::unique_ptr<SchemaNode> &&newChild);
+    void addChild(std::unique_ptr<Node> &&newChild);
 
-    const std::vector<std::unique_ptr<SchemaNode> > &getChildren() const;
+    const std::vector<std::unique_ptr<Node> > &getChildren() const;
 private:
-    std::vector<std::unique_ptr<SchemaNode> > children;
+    std::vector<std::unique_ptr<Node> > children;
 };
     
 

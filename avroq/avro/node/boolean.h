@@ -1,14 +1,14 @@
 #ifndef __avroq__boolean__
 #define __avroq__boolean__
 
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class Boolean : public SchemaNode {
+class Boolean : public Node {
 public:
-    explicit Boolean(const std::string &name);
+    explicit Boolean(int number, const std::string &name);
 };
 
 }

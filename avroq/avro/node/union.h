@@ -3,19 +3,19 @@
 #define __avroq__union__
 
 #include <vector>
-#include "schemanode.h"
+#include "node.h"
 
 namespace avro {
 namespace node {
 
-class Union : public SchemaNode {
+class Union : public Node {
 public:
-    explicit Union(const std::string &name);
-    void addChild(std::unique_ptr<SchemaNode> definition);
-    const std::vector<std::unique_ptr<SchemaNode> > &getChildren() const;
+    explicit Union(int number, const std::string &name);
+    void addChild(std::unique_ptr<Node> definition);
+    const std::vector<std::unique_ptr<Node> > &getChildren() const;
 
 private:
-    std::vector<std::unique_ptr<SchemaNode>> children;
+    std::vector<std::unique_ptr<Node>> children;
 };
 
 }
