@@ -5,7 +5,7 @@ namespace avro {
 namespace node {
 
 Custom::Custom(int number, const std::string &typeName)
-    : Node(number, typeName, "custom_type_name") { // TODO: check it it's correct
+    : Node(number, "custom_type_name", typeName) { // TODO: check it it's correct
 }
 
 void Custom::setDefinition(std::unique_ptr<Node> && definition) {

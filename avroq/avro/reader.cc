@@ -1,10 +1,3 @@
-//
-//  Reader.cc
-//  avroq
-//
-//  Created by Mikhail Galanin on 12/12/14.
-//  Copyright (c) 2014 Mikhail Galanin. All rights reserved.
-//
 
 #include <cstdint>
 #include <cstring>
@@ -14,6 +7,10 @@
 
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
+
+#include <boost/algorithm/string.hpp>
+
+#include <boost/lexical_cast.hpp>
 
 #include "schemareader.h"
 #include "node/node.h"
@@ -131,7 +128,7 @@ private:
     std::streamsize bytesLeft = 0;
 };
 
-void Reader::readBlock(const header &header) {
+void Reader::readBlock(const header &header, const FilterExpression *filter) {
 
     // throw Eof();
 
@@ -158,7 +155,7 @@ void Reader::readBlock(const header &header) {
         }
         */
         for(int i = 0; i < objectCountInBlock; ++i) {
-            decodeBlock(*deflate_stream, header.schema);
+            decodeBlock(*deflate_stream, header.schema, filter);
         }
 
         deflate_stream->seekg(0, std::ios_base::end);
@@ -181,16 +178,16 @@ void Reader::readBlock(const header &header) {
 void skipLong(std::istream &input) {
     uint8_t u;
     do {
-            if (input.eof()) {
-                throw Reader::Eof();
-            }
+        if (input.eof()) {
+            throw Reader::Eof();
+        }
 
         u = static_cast<uint8_t>(input.get());
         // d->read.push_back(u);
     } while (u & 0x80);
 }
 
-void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<Node> &schema, int level) {
+void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter, int level) {
     if (schema->is<node::Record>()) {
         /*
         for(int i = 0; i < level; ++i) {
@@ -198,7 +195,7 @@ void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std:
         }
         std::cout << schema->getItemName() << " {\n";*/
         for(auto &p : schema->as<node::Record>().getChildren()) {
-            decodeBlock(stream, p, level + 1);
+            decodeBlock(stream, p, filter, level + 1);
         }
         /*for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -211,24 +208,31 @@ void Reader::decodeBlock(boost::iostreams::filtering_istream &stream, const std:
         int item = readLong(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
         // std::cout << "union " << node->getItemName() << ": " << node->getTypeName() << std::endl;
-        decodeBlock(stream, node, level + 1);
+        decodeBlock(stream, node, filter, level + 1);
     } else if (schema->is<node::Custom>()) {
         /*for(int i = 0; i < level; ++i) {
             std::cout << "\t";
         }
         std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;*/
-        decodeBlock(stream, schema->as<node::Custom>().getDefinition(), level + 1);
+        decodeBlock(stream, schema->as<node::Custom>().getDefinition(), filter, level + 1);
     } else {
         /*for(int i = 0; i < level; ++i) {
             std::cout << "\t";
         }*/
         if (schema->is<node::String>()) {
             //
-            readString(stream);
+            const std::string value = readString(stream);
+            if (schema.get() == filter->shemaItem && value == filter->strValue) {
+                // dump ducument
+            }
             // std::cout << schema->getItemName() << ": \"" << readString(stream)  << '"' << std::endl;
         } else if (schema->is<node::Int>()) {
-            skipLong(stream); //
-            // readLong(stream);
+            // skipLong(stream); //
+            int value = readLong(stream);
+
+            if (schema.get() == filter->shemaItem && value == filter->value.i) {
+                // dump ducument
+            }
             // std::cout << schema->getItemName() << ": " << readLong(stream) << std::endl;
         } else if (schema->is<node::Float>()) {
             readFloat(stream);
@@ -322,8 +326,8 @@ int64_t Reader::readLong(std::istream &input) {
     return decodeZigzag64(encoded);
 }
 
-int64_t
-decodeZigzag64(uint64_t input)
+inline
+int64_t decodeZigzag64(uint64_t input)
 {
     return static_cast<int64_t>(((input >> 1) ^ -(static_cast<int64_t>(input) & 1)));
 }
@@ -378,6 +382,55 @@ boost::iostreams::zlib_params get_zlib_params() {
   result.method = boost::iostreams::zlib::deflated;
   result.noheader = true;
   return result;
+}
+
+FilterExpression Reader::compileCondition(const std::string &what, const std::string &condition, const header &header) {
+
+    FilterExpression result;
+    std::vector<std::string> chunks;
+    boost::algorithm::split(chunks, what, boost::is_any_of("."));
+
+    auto currentNode = header.schema.get();
+
+    for(auto p = chunks.begin(); p != chunks.end(); ++p) {
+        std::cout << "XX " << *p << std::endl;
+        if (currentNode->is<node::Custom>()) {
+            currentNode = currentNode->as<node::Custom>().getDefinition().get();
+        }
+        if (currentNode->is<node::Record>()) {
+            for( auto &n : currentNode->as<node::Record>().getChildren()) {
+                std::cout << "checking " << n->getItemName() << std::endl;
+                if (n->getItemName() == *p) {
+                    std::cout << " found " << *p << std::endl;
+                    currentNode = n.get();
+                    goto next;
+                }
+            }
+            std::cout << " not found " << *p << std::endl;
+            throw PathNotFound();
+        } else {
+            std::cout << "Can't find path" << std::endl;
+        }
+
+        throw PathNotFound();
+next://
+        (void)currentNode;
+    }
+
+    result.shemaItem = currentNode;
+    result.what = what;
+
+    if (currentNode->is<node::String>()) {
+        result.strValue = condition;
+    } else if (currentNode->is<node::Int>()) {
+        result.value.i = boost::lexical_cast<int>(condition);
+    } else {
+        std::cout << "Unsupported type: " << currentNode->getTypeName() << " name=" <<currentNode->getItemName() << std::endl;
+
+        throw PathNotFound();
+    }
+
+    return result;
 }
 
 

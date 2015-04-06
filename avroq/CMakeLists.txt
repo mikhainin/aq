@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (avroq)
 
-find_package(Boost COMPONENTS iostreams)
+find_package(Boost COMPONENTS iostreams program_options)
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
 else()
