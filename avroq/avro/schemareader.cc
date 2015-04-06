@@ -8,7 +8,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
-#include "node/Node.h"
+#include "node/node.h"
 #include "node/custom.h"
 #include "node/record.h"
 #include "node/string.h"
@@ -89,8 +89,9 @@ SchemaReader::~SchemaReader() {
 }
 
 std::unique_ptr<Node> SchemaReader::parse() {
-    std::stringstream ss(schemaJson);
+    std::istringstream ss(schemaJson);
 
+    using boost::property_tree::ptree;
     boost::property_tree::ptree pt;
     boost::property_tree::read_json(ss, pt);
 

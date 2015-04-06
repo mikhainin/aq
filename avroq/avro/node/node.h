@@ -2,6 +2,7 @@
 #define AVROQ_AVRO_SCHEMANODE_H_
 
 #include <string>
+#include <memory>
 
 namespace avro {
 
