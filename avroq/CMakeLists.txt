@@ -15,4 +15,4 @@ add_subdirectory (avro)
 
 add_executable(avroq main.cc)
 
-target_link_libraries (avroq avro ${Boost_LIBRARIES})
+target_link_libraries (avroq avro ${Boost_LIBRARIES} z)

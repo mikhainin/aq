@@ -16,6 +16,7 @@
 // TODO: remove this include from this file
 #include "avro/node/node.h"
 #include "avro/reader.h"
+#include "avro/eof.h"
 
 namespace po = boost::program_options;
 
@@ -73,7 +74,7 @@ int main(int argc, const char * argv[]) {
                         reader.readBlock(header);
                     }
                 }
-            } catch (const avro::Reader::Eof &e) {
+            } catch (const avro::Eof &e) {
                 ; // reading done
             }
         }
