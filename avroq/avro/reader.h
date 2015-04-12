@@ -19,6 +19,7 @@ namespace avro {
 
 class Node;
 class DeflatedBuffer;
+class Limiter;
 
 struct header {
     std::map<std::string, std::string> metadata;
@@ -52,7 +53,7 @@ public:
 
     class DumpObject {};
 
-    Reader(const std::string & filename);
+    Reader(const std::string & filename, Limiter &limit);
     ~Reader();
 
     header readHeader();

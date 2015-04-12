@@ -16,6 +16,8 @@
 #include <boost/lexical_cast.hpp>
 
 #include "schemareader.h"
+#include "limiter.h"
+
 #include "node/node.h"
 #include "node/record.h"
 #include "node/union.h"
@@ -49,13 +51,14 @@ public:
     std::unique_ptr<StringBuffer> input;
 
     DeflatedBuffer deflate_buffer;
+    Limiter &limit;
 
-    // std::ifstream input;
-    // std::vector<uint8_t> read; // for debug purposes
+    Private(Limiter &limit) : limit(limit) {
+    }
 };
 
-Reader::Reader(const std::string& filename) :
-    d(new Private()) {
+Reader::Reader(const std::string& filename, Limiter &limit) :
+    d(new Private(limit)) {
 
     d->filename = filename;
 
@@ -176,12 +179,17 @@ void Reader::readBlock(const header &header, const FilterExpression *filter) {
         d->deflate_buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
 
         for(int i = 0; i < objectCountInBlock; ++i) {
+            if (!filter) {
+                dumpDocument(d->deflate_buffer, header.schema, 0);
+                d->limit.documentFinished();
+            }
             try {
                 d->deflate_buffer.startDocument();
                 decodeBlock(d->deflate_buffer, header.schema, filter);
             } catch (const DumpObject &e) {
                 d->deflate_buffer.resetToDocument();
                 dumpDocument(d->deflate_buffer, header.schema, 0);
+                d->limit.documentFinished();
             }
         }
 
@@ -221,7 +229,6 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
 
             if (filter && schema.get() == filter->shemaItem && value == filter->value.i) {
                 // dump ducument
-                std::cout << "FOUND!!!" << std::endl;
                 throw DumpObject();
             }
         } else if (schema->is<node::Float>()) {
@@ -243,10 +250,10 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
 void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level) {
     if (schema->is<node::Record>()) {
 
-        for(int i = 0; i < level; ++i) {
+        /*for(int i = 0; i < level; ++i) {
             std::cout << "\t";
-        }
-        std::cout << schema->getItemName() << " {\n";
+        } */
+        std::cout << "{\n";
         for(auto &p : schema->as<node::Record>().getChildren()) {
             dumpDocument(stream, p, level + 1);
         }
@@ -255,19 +262,19 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
         }
         std::cout << "}\n";
     } else if (schema->is<node::Union>()) {
-        for(int i = 0; i < level; ++i) {
+        /*for(int i = 0; i < level; ++i) {
             std::cout << "\t";
-        }
+        }*/
         int item = readZigZagLong(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
-        std::cout << "union " << node->getItemName() << ": " << node->getTypeName() << std::endl;
-        dumpDocument(stream, node, level + 1);
+        // std::cout << "union " << node->getItemName() << ": " << node->getTypeName() << std::endl;
+        dumpDocument(stream, node, level);
     } else if (schema->is<node::Custom>()) {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
         }
-        std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
-        dumpDocument(stream, schema->as<node::Custom>().getDefinition(), level + 1);
+        std::cout << schema->getItemName() /* << ":" << schema->getTypeName() << std::endl */ ;
+        dumpDocument(stream, schema->as<node::Custom>().getDefinition(), level);
     } else {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -413,18 +420,31 @@ next://
         (void)currentNode;
     }
 
-    result.shemaItem = currentNode;
-    result.what = what;
-
     if (currentNode->is<node::String>()) {
         result.strValue = condition;
     } else if (currentNode->is<node::Int>()) {
         result.value.i = boost::lexical_cast<int>(condition);
+    } else if (currentNode->is<node::Union>()) {
+        for( auto &p : currentNode->as<node::Union>().getChildren()) {
+            if (p->is<node::String>()) {
+                result.strValue = condition;
+                currentNode = p.get();
+                break;
+            } else if (p->is<node::Int>()) {
+                result.value.i = boost::lexical_cast<int>(condition);
+                currentNode = p.get();
+                break;
+            }
+        }
     } else {
         std::cout << "Unsupported type: " << currentNode->getTypeName() << " name=" <<currentNode->getItemName() << std::endl;
 
         throw PathNotFound();
     }
+
+    result.shemaItem = currentNode;
+    result.what = what;
+
 
     return result;
 }

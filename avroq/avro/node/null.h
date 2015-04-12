@@ -8,7 +8,7 @@ namespace node {
 
 class Null : public Node {
 public:
-    explicit Null(int number);
+    explicit Null(int number, const std::string &name);
 };
 
 }

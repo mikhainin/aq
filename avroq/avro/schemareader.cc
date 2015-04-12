@@ -77,7 +77,7 @@ std::unique_ptr<Node> SchemaReader::NodeByTypeName(const std::string &typeName, 
     } else if (typeName == "boolean") {
         return std::unique_ptr<Node>(new node::Boolean(currentIndex++, itemName));
     } else if (typeName == "null") {
-        return std::unique_ptr<Node>(new node::Null(currentIndex++));
+        return std::unique_ptr<Node>(new node::Null(currentIndex++, itemName));
     }
     throw std::runtime_error("unknown node type: '" + typeName + "' for node '" + itemName + "'");
 }
