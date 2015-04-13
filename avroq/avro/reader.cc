@@ -1,3 +1,4 @@
+#include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -71,13 +72,16 @@ Reader::Reader(const std::string& filename, Limiter &limit) :
     // TODO: check if opened
     assert(d->fd > 0);
 
-    size_t len = d->fileLength;
-
-    len = (len/4096 + 1) * 4096;
+    size_t len = (d->fileLength/4096 + 1) * 4096;
 
     d->mmappedFile =
      (const char *)mmap(nullptr, len, PROT_READ, MAP_PRIVATE, d->fd, 0);
-    assert(errno == 0);
+    if (d->mmappedFile == MAP_FAILED) {
+        // TODO: handle this case correctyl
+        // close FD, provide useful information how to avoid this error
+        perror(d->filename.c_str());
+        throw std::runtime_error("Can't mmap file " + d->filename);
+    }
 
     d->input.reset(new StringBuffer(d->mmappedFile, d->fileLength));
 
@@ -86,6 +90,14 @@ Reader::Reader(const std::string& filename, Limiter &limit) :
 }
 
 Reader::~Reader() {
+    if (d->mmappedFile && d->mmappedFile != MAP_FAILED) {
+        munmap((void*)d->mmappedFile, (d->fileLength/4096 + 1) * 4096);
+        d->mmappedFile = nullptr;
+    }
+    if (d->fd) {
+        close(d->fd);
+        d->fd = 0;
+    }
     delete d;
 }
 
