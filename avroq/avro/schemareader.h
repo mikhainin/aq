@@ -16,6 +16,7 @@ namespace node {
     class Record;
     class Union;
     class Custom;
+    class Enum;
 }
 class NodeDescriptor;
 class Node;
@@ -37,6 +38,7 @@ private:
     std::unique_ptr<Node> NodeByTypeName(const std::string &typeName, const std::string &itemName);
 
     void readRecordFields(const boost::property_tree::ptree &node, node::Record &record);
+    void readEnumValues(const boost::property_tree::ptree &node, node::Enum &e);
     void readRecordDefinition(const boost::property_tree::ptree &node, node::Custom &record);
     std::unique_ptr<node::Union> readUnion(const boost::property_tree::ptree &node, const std::string &name);
     

@@ -37,7 +37,7 @@ public:
 
     inline
     bool eof() {
-        return buf.size() <= pointer;
+        return length < pointer;
     }
 
     void read(void *to, size_t len);

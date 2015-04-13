@@ -25,7 +25,9 @@
 #include "node/string.h"
 #include "node/custom.h"
 #include "node/int.h"
+#include "node/long.h"
 #include "node/boolean.h"
+#include "node/enum.h"
 #include "node/float.h"
 #include "node/double.h"
 #include "node/null.h"
@@ -53,6 +55,7 @@ public:
 
     DeflatedBuffer deflate_buffer;
     Limiter &limit;
+
 
     Private(Limiter &limit) : limit(limit) {
     }
@@ -191,17 +194,20 @@ void Reader::readBlock(const header &header, const FilterExpression *filter) {
         d->deflate_buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
 
         for(int i = 0; i < objectCountInBlock; ++i) {
+            // TODO: rewrite it using hierarcy of filters/decoders.
+            // TODO: implement counter as a filter  
             if (!filter) {
                 dumpDocument(d->deflate_buffer, header.schema, 0);
                 d->limit.documentFinished();
-            }
-            try {
-                d->deflate_buffer.startDocument();
-                decodeBlock(d->deflate_buffer, header.schema, filter);
-            } catch (const DumpObject &e) {
-                d->deflate_buffer.resetToDocument();
-                dumpDocument(d->deflate_buffer, header.schema, 0);
-                d->limit.documentFinished();
+            } else {
+                try {
+                    d->deflate_buffer.startDocument();
+                    decodeBlock(d->deflate_buffer, header.schema, filter);
+                } catch (const DumpObject &e) {
+                    d->deflate_buffer.resetToDocument();
+                    dumpDocument(d->deflate_buffer, header.schema, 0);
+                    d->limit.documentFinished();
+                }
             }
         }
 
@@ -237,6 +243,13 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
                 throw DumpObject();
             }
         } else if (schema->is<node::Int>()) {
+            int value = readZigZagLong(stream);
+
+            if (filter && schema.get() == filter->shemaItem && value == filter->value.i) {
+                // dump ducument
+                throw DumpObject();
+            }
+        } else if (schema->is<node::Long>()) {
             int value = readZigZagLong(stream);
 
             if (filter && schema.get() == filter->shemaItem && value == filter->value.i) {
@@ -287,6 +300,10 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
         }
         std::cout << schema->getItemName() /* << ":" << schema->getTypeName() << std::endl */ ;
         dumpDocument(stream, schema->as<node::Custom>().getDefinition(), level);
+    } else if (schema->is<node::Enum>()) {
+        int index = readZigZagLong(stream);
+        const std::string &value = schema->as<node::Enum>()[index];
+        std::cout << /* schema->getItemName() <<*/ ": \"" << value  << '"' << std::endl;
     } else {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -295,6 +312,9 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
             const std::string value = stream.getStdString(readZigZagLong(stream));
             std::cout << schema->getItemName() << ": \"" << value  << '"' << std::endl;
         } else if (schema->is<node::Int>()) {
+            int value = readZigZagLong(stream);
+            std::cout << schema->getItemName() << ": " << value << std::endl;
+        } else if (schema->is<node::Long>()) {
             int value = readZigZagLong(stream);
             std::cout << schema->getItemName() << ": " << value << std::endl;
         } else if (schema->is<node::Float>()) {
@@ -435,6 +455,8 @@ next://
     if (currentNode->is<node::String>()) {
         result.strValue = condition;
     } else if (currentNode->is<node::Int>()) {
+        result.value.i = boost::lexical_cast<int>(condition);
+    } else if (currentNode->is<node::Long>()) {
         result.value.i = boost::lexical_cast<int>(condition);
     } else if (currentNode->is<node::Union>()) {
         for( auto &p : currentNode->as<node::Union>().getChildren()) {

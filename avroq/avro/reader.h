@@ -32,7 +32,7 @@ struct FilterExpression {
     std::string what;
     Node *shemaItem;
     union {
-        int i;
+        long i;
         // std::string s;
         float f;
         double d;

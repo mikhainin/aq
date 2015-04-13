@@ -14,9 +14,11 @@
 #include "node/string.h"
 #include "node/union.h"
 #include "node/int.h"
+#include "node/long.h"
 #include "node/boolean.h"
 #include "node/float.h"
 #include "node/double.h"
+#include "node/enum.h"
 #include "node/null.h"
 #include "schemareader.h"
 
@@ -27,7 +29,16 @@ static bool isObject(const boost::property_tree::ptree &node) {
 }
 
 static bool isArray(const boost::property_tree::ptree &node) {
-    return node.front().first.empty() && !node.front().second.data().empty();
+
+    const auto &front = node.front();
+    bool isOrdinaryValue = !front.second.data().empty();
+    return front.first.empty() &&
+        (
+            isOrdinaryValue ||
+            isArray(front.second) ||
+            isObject(front.second)
+        );
+
 }
 
 static bool isValue(const boost::property_tree::ptree &node) {
@@ -39,6 +50,7 @@ class NodeDescriptor {
 public:
     std::string type;
     std::string name;
+    bool containsSymbols = false;
     bool containsFields = false;
     bool isCustomTypeDefinition = false;
     boost::property_tree::ptree node;
@@ -56,6 +68,8 @@ public:
             this->name = value;
         } else if (name == "fields") {
             containsFields = true;
+        } else if (name == "symbols") {
+            containsSymbols = true;
         } else {
             throw std::runtime_error("NodeDescriptor::assignField: unknown schema record name - '" + name + "'");
         }
@@ -66,10 +80,14 @@ public:
 std::unique_ptr<Node> SchemaReader::NodeByTypeName(const std::string &typeName, const std::string &itemName) {
     if (typeName == "record") {
         return std::unique_ptr<Node>(new node::Record(currentIndex++, itemName));
+    } else if (typeName == "enum") {
+        return std::unique_ptr<Node>(new node::Enum(currentIndex++, itemName));
     } else if (typeName == "string") {
         return std::unique_ptr<Node>(new node::String(currentIndex++, itemName));
     } else if (typeName == "int") {
         return std::unique_ptr<Node>(new node::Int(currentIndex++, itemName));
+    } else if (typeName == "long") {
+        return std::unique_ptr<Node>(new node::Long(currentIndex++, itemName));
     } else if (typeName == "float") {
         return std::unique_ptr<Node>(new node::Float(currentIndex++, itemName));
     } else if (typeName == "double") {
@@ -103,15 +121,16 @@ std::unique_ptr<Node> SchemaReader::parseOneJsonObject(const boost::property_tre
     auto descriptor = descriptorForJsonObject(node);
 
     std::unique_ptr<Node> newNode = nodeByType(node.get_child("type"), descriptor->name);
+    assert(newNode.get() != nullptr);
 
     if (newNode->is<node::Record>()) {
-        readRecordFields(node, dynamic_cast<node::Record &>(*newNode));
-    } else if (newNode->is<node::Custom>()) {
-        newNode->as<node::Custom>().setDefinition(parseOneJsonObject(node.get_child("type")));
+        readRecordFields(node, newNode->as<node::Record>());
     } else if (newNode->is<node::Union>()) {
         newNode = readUnion(node.get_child("type"), descriptor->name);
+    } else if (newNode->is<node::Enum>()) {
+        readEnumValues(node, newNode->as<node::Enum>());
     }
-
+    assert(newNode.get() != nullptr);
     return newNode;
 
 }
@@ -121,7 +140,11 @@ std::unique_ptr<Node> SchemaReader::nodeByType(const boost::property_tree::ptree
     if (isValue(type)) {
         return NodeByTypeName(type.data(), nodeName);
     } else if(isObject(type)) {
-        return std::unique_ptr<Node>(new node::Custom(currentIndex++, nodeName)); // parseEnum()->name
+        auto newNode = std::unique_ptr<Node>(new node::Custom(currentIndex++, nodeName));
+        if (newNode->is<node::Custom>()) {
+            newNode->as<node::Custom>().setDefinition(parseOneJsonObject(type));
+        }
+        return newNode;
     } else if (isArray(type)) {
         return std::unique_ptr<Node>(new node::Union(currentIndex++, nodeName));
     } else {
@@ -149,12 +172,20 @@ void SchemaReader::readRecordFields(const boost::property_tree::ptree &node, nod
 }
 
 std::unique_ptr<node::Union> SchemaReader::readUnion(const boost::property_tree::ptree &node, const std::string &name) {
-    auto enumNode = std::unique_ptr<node::Union>(new node::Union(currentIndex++, name));
+    auto unionNode = std::unique_ptr<node::Union>(new node::Union(currentIndex++, name));
     for(auto &p : node) {
-        enumNode->addChild(nodeByType(p.second, name));
+        unionNode->addChild(nodeByType(p.second, name));
     }
-    return enumNode; // TODO return good value
+    return unionNode; // TODO return good value
 }
+
+void SchemaReader::readEnumValues(const boost::property_tree::ptree &node, node::Enum &e) {
+    for(const auto &p : node.get_child("symbols")) {
+        e.addValue(p.second.data());
+        std::cout << "enum value" <<p.second.data() << std::endl;
+    }
+}
+
 
 int SchemaReader::nodesNumber() const {
     return currentIndex;
