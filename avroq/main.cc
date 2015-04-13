@@ -1,21 +1,15 @@
-//
-//  main.cpp
-//  avroq
-//
-//  Created by Mikhail Galanin on 09/11/14.
-//  Copyright (c) 2014 Mikhail Galanin. All rights reserved.
-//
 
 #include <iostream>
 #include <string>
 
 #include <boost/program_options.hpp>
-//#include <boost/algorithm/string.hpp>
-//#include <boost/filesystem.hpp>
 
-// TODO: remove this include from this file
+// TODO: remove this include (node.h) from this file
 #include "avro/node/node.h"
 #include "avro/reader.h"
+#include "avro/eof.h"
+#include "avro/finished.h"
+#include "avro/limiter.h"
 
 namespace po = boost::program_options;
 
@@ -25,17 +19,14 @@ int main(int argc, const char * argv[]) {
 
     std::string condition;
     std::string what;
-
+    int limit = -1;
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help,h", "Show help message")
-        // ("optimization", po::value<int>(&opt)->default_value(10),
-      // "optimization level")
-      //  ("include-path,I", po::value< std::vector<std::string> >(),
-      //"include path")
         ("input-file,f", po::value< std::vector<std::string> >(), "input files")
         ("what,w", po::value< std::string >(&what), "what")
         ("condition,c", po::value< std::string >(&condition), "expression")
+        ("limit,n", po::value< int >(&limit)->default_value(-1), "maximum number of records (default -1 means no limit")
     ;
     po::positional_options_description p;
     p.add("input-file", -1);
@@ -52,31 +43,37 @@ int main(int argc, const char * argv[]) {
 
 
     if (vm.count("input-file")) {
-        for(const auto &p : vm["input-file"].as< std::vector<std::string> >()) {
+        try {
+            avro::Limiter limiter(limit);
+            for(const auto &p : vm["input-file"].as< std::vector<std::string> >()) {
 
-            std::cout << "Processing " << p << std::endl;
+                std::cout << "Processing " << p << std::endl;
 
-            avro::Reader reader(p);
-            
-            avro::header header = reader.readHeader();
+                avro::Reader reader(p, limiter);
+                
+                avro::header header = reader.readHeader();
 
-            avro::FilterExpression filter;
-            if (condition.size() > 0) {
-                filter = reader.compileCondition(what, condition, header);
-            }
-            
-            try {
-                while (not reader.eof()) {
-                    if (condition.size() > 0) {
-                        reader.readBlock(header, &filter);
-                    } else {
-                        reader.readBlock(header);
-                    }
+                avro::FilterExpression filter;
+                if (condition.size() > 0) {
+                    filter = reader.compileCondition(what, condition, header);
                 }
-            } catch (const avro::Reader::Eof &e) {
-                ; // reading done
+                
+                try {
+                    while (not reader.eof()) {
+                        if (condition.size() > 0) {
+                            reader.readBlock(header, &filter);
+                        } else {
+                            reader.readBlock(header);
+                        }
+                    }
+                } catch (const avro::Eof &e) {
+                    ; // reading done
+                }
             }
+        } catch (const avro::Finished &e) {
+            ;
         }
+
     } else {
         std::cout << "No input files" << std::endl;
         return 1;

@@ -18,6 +18,8 @@
 namespace avro {
 
 class Node;
+class DeflatedBuffer;
+class Limiter;
 
 struct header {
     std::map<std::string, std::string> metadata;
@@ -45,11 +47,13 @@ struct FilterExpression {
 class Reader {
 public:
 
-    class Eof {};
+    // class Eof {};
 
     class PathNotFound {};
 
-    Reader(const std::string & filename);
+    class DumpObject {};
+
+    Reader(const std::string & filename, Limiter &limit);
     ~Reader();
 
     header readHeader();
@@ -64,15 +68,16 @@ private:
     class Private;
     Private *d = nullptr;
 
-    int64_t readLong(std::istream &input);
-    std::string readString(std::istream &input);
-    float readFloat(std::istream &input);
-    double readDouble(std::istream &input);
-    bool readBoolean(std::istream &input);
+    // int64_t readLong(std::istream &input);
+    std::string readString(DeflatedBuffer &input);
+    float readFloat(DeflatedBuffer &input);
+    double readDouble(DeflatedBuffer &input);
+    bool readBoolean(DeflatedBuffer &input);
 
     void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
-    void decodeBlock(boost::iostreams::filtering_istream &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter, int level = 0);
+    void decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter);
 
+    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
 };
 
 }

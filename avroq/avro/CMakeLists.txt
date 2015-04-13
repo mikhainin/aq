@@ -2,6 +2,8 @@ add_library(avro
 				 reader.cc
 				 schemareader.cc
                  stringbuffer.cc
+                 deflatedbuffer.cc
+                 limiter.cc
                  
 # TODO: move to subfolder
                  node/node.cc
