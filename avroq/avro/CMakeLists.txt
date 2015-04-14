@@ -6,6 +6,7 @@ add_library(avro
                  limiter.cc
                  
 # TODO: move to subfolder
+                 node/array.cc
                  node/boolean.cc
                  node/custom.cc
                  node/double.cc
@@ -13,6 +14,7 @@ add_library(avro
                  node/float.cc
                  node/int.cc
                  node/long.cc
+                 node/map.cc
                  node/node.cc
                  node/null.cc
                  node/record.cc

@@ -26,10 +26,12 @@
 #include "node/custom.h"
 #include "node/int.h"
 #include "node/long.h"
+#include "node/array.h"
 #include "node/boolean.h"
 #include "node/enum.h"
 #include "node/float.h"
 #include "node/double.h"
+#include "node/map.h"
 #include "node/null.h"
 
 #include "deflatedbuffer.h"
@@ -137,7 +139,6 @@ header Reader::readHeader() {
     //dumpShema(schemaRoot);
     
     char c = d->input->getChar();
-    // d->input.read(&c, 1);
 
     assert(c == 0); // TODO: what is it?
     d->input->read(&header.sync[0], sizeof header.sync);
@@ -146,43 +147,6 @@ header Reader::readHeader() {
     return header;
 
 }
-
-boost::iostreams::zlib_params get_zlib_params();
-
-class my_input_filter : public boost::iostreams::multichar_input_filter {
-public:
-    template<typename Source>
-    std::streamsize read(Source &, char* s, std::streamsize n)
-    {
-        if (bytesLeft == 0) {
-            return -1;
-        }
-
-        std::streamsize bytesRead = -1; // EOF;
-
-        if (bytesLeft >= n) {
-
-            bytesRead = boost::iostreams::read(source, s, n);
-
-        } else if (bytesLeft < n) {
-            bytesRead = boost::iostreams::read(source, s, bytesLeft);
-        }
-
-        if (bytesRead > 0) {
-            bytesLeft -= bytesRead;
-        }
-
-        return bytesRead;
-    }
-
-    my_input_filter(std::ifstream &source, std::streamsize bytesLeft) :
-        boost::iostreams::multichar_input_filter(), source(source), bytesLeft(bytesLeft) {
-    }
-
-private:
-    std::ifstream &source;
-    std::streamsize bytesLeft = 0;
-};
 
 void Reader::readBlock(const header &header, const FilterExpression *filter) {
 
@@ -304,6 +268,41 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
         int index = readZigZagLong(stream);
         const std::string &value = schema->as<node::Enum>()[index];
         std::cout << /* schema->getItemName() <<*/ ": \"" << value  << '"' << std::endl;
+    } else if (schema->is<node::Array>()) {
+        auto const &node = schema->as<node::Array>().getItemsType();
+
+        std::cout << "[\n";
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = readZigZagLong(stream);
+            for(int i = 0; i < objectsInBlock; ++i) {
+                dumpDocument(stream, node, level + 1);
+            }
+        } while(objectsInBlock != 0);
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << "]\n";
+    } else if (schema->is<node::Map>()) {
+        auto const &node = schema->as<node::Map>().getItemsType();
+
+        std::cout << "[\n";
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = readZigZagLong(stream);
+
+            for(int i = 0; i < objectsInBlock; ++i) {
+                for(int k = 0; k < level+1; ++k) {
+                    std::cout << "\t";
+                }
+                std::cout << readString(stream);
+                dumpDocument(stream, node, 1);
+            }
+        } while(objectsInBlock != 0);
+        for(int i = 0; i < level; ++i) {
+            std::cout << "\t";
+        }
+        std::cout << "]\n";
     } else {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";

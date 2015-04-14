@@ -9,6 +9,7 @@
 #include <boost/property_tree/json_parser.hpp>
 
 #include "node/node.h"
+#include "node/array.h"
 #include "node/custom.h"
 #include "node/record.h"
 #include "node/string.h"
@@ -19,7 +20,9 @@
 #include "node/float.h"
 #include "node/double.h"
 #include "node/enum.h"
+#include "node/map.h"
 #include "node/null.h"
+
 #include "schemareader.h"
 
 namespace avro {
@@ -52,6 +55,8 @@ public:
     std::string name;
     bool containsSymbols = false;
     bool containsFields = false;
+    bool containsValues = false;
+    bool containsItems = false;
     bool isCustomTypeDefinition = false;
     boost::property_tree::ptree node;
 
@@ -70,19 +75,26 @@ public:
             containsFields = true;
         } else if (name == "symbols") {
             containsSymbols = true;
+        } else if (name == "values") {
+            containsValues = true;
+        } else if (name == "items") {
+            containsItems = true;
         } else {
             throw std::runtime_error("NodeDescriptor::assignField: unknown schema record name - '" + name + "'");
         }
     }
 };
 
-// TODO: move to member
-std::unique_ptr<Node> SchemaReader::NodeByTypeName(const std::string &typeName, const std::string &itemName) {
+std::unique_ptr<Node> SchemaReader::nodeByTypeName(const std::string &typeName, const std::string &itemName) {
     if (typeName == "record") {
         return std::unique_ptr<Node>(new node::Record(currentIndex++, itemName));
     } else if (typeName == "enum") {
         return std::unique_ptr<Node>(new node::Enum(currentIndex++, itemName));
+    } else if (typeName == "array") {
+        return std::unique_ptr<Node>(new node::Array(currentIndex++, itemName));
     } else if (typeName == "string") {
+        return std::unique_ptr<Node>(new node::String(currentIndex++, itemName));
+    } else if (typeName == "bytes") { // TODO: make real type "bytes"
         return std::unique_ptr<Node>(new node::String(currentIndex++, itemName));
     } else if (typeName == "int") {
         return std::unique_ptr<Node>(new node::Int(currentIndex++, itemName));
@@ -96,6 +108,8 @@ std::unique_ptr<Node> SchemaReader::NodeByTypeName(const std::string &typeName, 
         return std::unique_ptr<Node>(new node::Boolean(currentIndex++, itemName));
     } else if (typeName == "null") {
         return std::unique_ptr<Node>(new node::Null(currentIndex++, itemName));
+    } else if (typeName == "map") {
+        return std::unique_ptr<Node>(new node::Map(currentIndex++, itemName));
     }
     throw std::runtime_error("unknown node type: '" + typeName + "' for node '" + itemName + "'");
 }
@@ -127,6 +141,10 @@ std::unique_ptr<Node> SchemaReader::parseOneJsonObject(const boost::property_tre
         readRecordFields(node, newNode->as<node::Record>());
     } else if (newNode->is<node::Union>()) {
         newNode = readUnion(node.get_child("type"), descriptor->name);
+    } else if (newNode->is<node::Array>()) {
+        newNode->as<node::Array>().setItemsType(nodeByType(node.get_child("items"), descriptor->name));
+    } else if (newNode->is<node::Map>()) {
+        newNode->as<node::Map>().setItemsType(nodeByType(node.get_child("values"), descriptor->name));
     } else if (newNode->is<node::Enum>()) {
         readEnumValues(node, newNode->as<node::Enum>());
     }
@@ -138,7 +156,7 @@ std::unique_ptr<Node> SchemaReader::parseOneJsonObject(const boost::property_tre
 std::unique_ptr<Node> SchemaReader::nodeByType(const boost::property_tree::ptree &type,
                                                      const std::string &nodeName) {
     if (isValue(type)) {
-        return NodeByTypeName(type.data(), nodeName);
+        return nodeByTypeName(type.data(), nodeName);
     } else if(isObject(type)) {
         auto newNode = std::unique_ptr<Node>(new node::Custom(currentIndex++, nodeName));
         if (newNode->is<node::Custom>()) {
