@@ -1,7 +1,9 @@
 #include <zlib.h>
 #include <assert.h>
+#include <string.h>
 
 #include <algorithm>
+#include <stdexcept>
 
 #include "deflatedbuffer.h"
 namespace avro {

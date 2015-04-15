@@ -1,3 +1,4 @@
+#include <string.h>
 
 #include "stringbuffer.h"
 namespace avro {
