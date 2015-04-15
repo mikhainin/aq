@@ -12,7 +12,7 @@ public:
     explicit StringBuffer(const char *c, size_t length);
 
     const char *getAndSkip(size_t len);
-    char size() const;
+    size_t size() const;
     char getChar();
     std::string getStdString(size_t len);
     void read(void *to, size_t len);

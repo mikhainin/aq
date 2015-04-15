@@ -30,8 +30,6 @@ void DeflatedBuffer::decompress(const char *compressedData, size_t compressedDat
     strm.opaque = Z_NULL;
     strm.avail_in = 0;
     strm.next_in = Z_NULL;
-    // strm.zalloc = malloc;
-    // strm.zfree = free;
     ret = inflateInit2(&strm, -15);
     assert(ret == Z_OK);
 
@@ -45,11 +43,10 @@ void DeflatedBuffer::decompress(const char *compressedData, size_t compressedDat
         if (strm.avail_in == 0)
             break;
         strm.next_in = (unsigned char *)(compressedData + offset);
-        /* run inflate() on input until output buffer not full */
         do {
 
-            strm.avail_out = (uInt)buf.size();
-            strm.next_out = buf.data();
+            strm.avail_out = (uInt)buf.size() - offset;
+            strm.next_out = buf.data() + offset;
             ret = inflate(&strm, Z_NO_FLUSH);
             assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
             switch (ret) {
@@ -61,13 +58,6 @@ void DeflatedBuffer::decompress(const char *compressedData, size_t compressedDat
                 throw std::runtime_error("Z_MEM_ERROR/Z_DATA_ERROR/Z_NEED_DICT");
             }
 
-            // have = CHUNK - strm.avail_out;
-            /*
-            if (fwrite(out, 1, have, dest) != have || ferror(dest)) {
-                (void)inflateEnd(&strm);
-                throw std::runtime_error("Z_ERRNO");
-            }
-            */
         } while (strm.avail_out == 0);
 
         avail -= strm.avail_in;

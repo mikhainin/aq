@@ -1,9 +1,3 @@
-/*
- * SchemaReader.h
- *
- *  Created on: 21 дек. 2014 г.
- *      Author: a
- */
 
 #ifndef AVROQ_AVRO_SCHEMAREADER_H_
 #define AVROQ_AVRO_SCHEMAREADER_H_
@@ -13,9 +7,11 @@
 namespace avro {
 
 namespace node {
+    class Array;
+    class Custom;
+    class Enum;
     class Record;
     class Union;
-    class Custom;
 }
 class NodeDescriptor;
 class Node;
@@ -34,9 +30,10 @@ private:
 
     std::unique_ptr<Node> parseOneJsonObject(const boost::property_tree::ptree &node);
     std::unique_ptr<NodeDescriptor> descriptorForJsonObject(const boost::property_tree::ptree &node);
-    std::unique_ptr<Node> NodeByTypeName(const std::string &typeName, const std::string &itemName);
+    std::unique_ptr<Node> nodeByTypeName(const std::string &typeName, const std::string &itemName);
 
     void readRecordFields(const boost::property_tree::ptree &node, node::Record &record);
+    void readEnumValues(const boost::property_tree::ptree &node, node::Enum &e);
     void readRecordDefinition(const boost::property_tree::ptree &node, node::Custom &record);
     std::unique_ptr<node::Union> readUnion(const boost::property_tree::ptree &node, const std::string &name);
     

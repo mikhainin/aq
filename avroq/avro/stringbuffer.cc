@@ -16,7 +16,7 @@ const char *StringBuffer::getAndSkip(size_t len) {
     return result;
 }
 
-char StringBuffer::size() const {
+size_t StringBuffer::size() const {
     return length;
 }
 
@@ -33,7 +33,6 @@ std::string StringBuffer::getStdString(size_t len) {
     read((void*)result.data(), len);
 
     return result;
-    
 }
 
 void StringBuffer::read(void *to, size_t len) {
