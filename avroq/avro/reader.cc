@@ -68,7 +68,6 @@ Reader::Reader(const std::string& filename, Limiter &limit) :
 
     d->filename = filename;
 
-
     struct stat st;
     stat(d->filename.c_str(), &st);
     d->fileLength = st.st_size;
@@ -89,9 +88,6 @@ Reader::Reader(const std::string& filename, Limiter &limit) :
     }
 
     d->input.reset(new StringBuffer(d->mmappedFile, d->fileLength));
-
-
-    // d->input.open(filename);
 }
 
 Reader::~Reader() {
@@ -199,6 +195,32 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
         decodeBlock(stream, node, filter);
     } else if (schema->is<node::Custom>()) {
         decodeBlock(stream, schema->as<node::Custom>().getDefinition(), filter);
+    } else if (schema->is<node::Enum>()) {
+        int index = readZigZagLong(stream);
+        (void)index;
+    } else if (schema->is<node::Array>()) {
+        auto const &node = schema->as<node::Array>().getItemsType();
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = readZigZagLong(stream);
+            for(int i = 0; i < objectsInBlock; ++i) {
+                decodeBlock(stream, node, filter);
+            }
+        } while(objectsInBlock != 0);
+
+    } else if (schema->is<node::Map>()) {
+        auto const &node = schema->as<node::Map>().getItemsType();
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = readZigZagLong(stream);
+
+            for(int i = 0; i < objectsInBlock; ++i) {
+                readString(stream);
+                decodeBlock(stream, node, filter);
+            }
+        } while(objectsInBlock != 0);
     } else {
         if (schema->is<node::String>()) {
             const std::string value = readString(stream);
