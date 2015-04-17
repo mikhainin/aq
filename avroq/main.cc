@@ -17,6 +17,8 @@ namespace po = boost::program_options;
 
 int main(int argc, const char * argv[]) {
 
+    std::cout.sync_with_stdio(false);
+
     std::string condition;
     std::string what;
     int limit = -1;

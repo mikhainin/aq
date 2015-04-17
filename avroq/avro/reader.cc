@@ -449,23 +449,24 @@ FilterExpression Reader::compileCondition(const std::string &what, const std::st
     auto currentNode = header.schema.get();
 
     for(auto p = chunks.begin(); p != chunks.end(); ++p) {
-        std::cout << "XX " << *p << std::endl;
+        //std::cout << "XX " << *p << std::endl;
         if (currentNode->is<node::Custom>()) {
             currentNode = currentNode->as<node::Custom>().getDefinition().get();
         }
         if (currentNode->is<node::Record>()) {
             for( auto &n : currentNode->as<node::Record>().getChildren()) {
-                std::cout << "checking " << n->getItemName() << std::endl;
+                //std::cout << "checking " << n->getItemName() << std::endl;
                 if (n->getItemName() == *p) {
-                    std::cout << " found " << *p << std::endl;
+                    //std::cout << " found " << *p << std::endl;
                     currentNode = n.get();
                     goto next;
                 }
             }
-            std::cout << " not found " << *p << std::endl;
+            // std::cout << " not found " << *p << std::endl;
             throw PathNotFound();
         } else {
             std::cout << "Can't find path" << std::endl;
+            throw PathNotFound();
         }
 
         throw PathNotFound();
