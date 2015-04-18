@@ -35,6 +35,7 @@
 #include "node/null.h"
 
 #include "deflatedbuffer.h"
+#include "filehandler.h"
 #include "stringbuffer.h"
 #include "zigzag.hpp"
 #include "reader.h"
@@ -47,58 +48,26 @@ namespace avro {
 
 class Reader::Private {
 public:
-    std::string filename;
-    const char *mmappedFile = nullptr;
-    size_t fileLength = 0;
-
-    int fd = -1;
+    std::string filename; // TODO: move to FileHandle
 
     std::unique_ptr<StringBuffer> input;
 
     DeflatedBuffer deflate_buffer;
     Limiter &limit;
 
+    FileHandle file;
 
-    Private(Limiter &limit) : limit(limit) {
+    Private(const std::string& filename, Limiter &limit) : filename(filename), limit(limit), file(filename) {
     }
 };
 
 Reader::Reader(const std::string& filename, Limiter &limit) :
-    d(new Private(limit)) {
+    d(new Private(filename, limit)) {
 
-    d->filename = filename;
-
-    struct stat st;
-    stat(d->filename.c_str(), &st);
-    d->fileLength = st.st_size;
-
-    d->fd = open(d->filename.c_str(), O_RDONLY);
-    // TODO: check if opened
-    assert(d->fd > 0);
-
-    size_t len = (d->fileLength/4096 + 1) * 4096;
-
-    d->mmappedFile =
-     (const char *)mmap(nullptr, len, PROT_READ, MAP_PRIVATE, d->fd, 0);
-    if (d->mmappedFile == MAP_FAILED) {
-        // TODO: handle this case correctyl
-        // close FD, provide useful information how to avoid this error
-        perror(d->filename.c_str());
-        throw std::runtime_error("Can't mmap file " + d->filename);
-    }
-
-    d->input.reset(new StringBuffer(d->mmappedFile, d->fileLength));
+    d->input = d->file.mmapFile();
 }
 
 Reader::~Reader() {
-    if (d->mmappedFile && d->mmappedFile != MAP_FAILED) {
-        munmap((void*)d->mmappedFile, (d->fileLength/4096 + 1) * 4096);
-        d->mmappedFile = nullptr;
-    }
-    if (d->fd) {
-        close(d->fd);
-        d->fd = 0;
-    }
     delete d;
 }
 

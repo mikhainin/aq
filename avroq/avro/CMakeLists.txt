@@ -4,6 +4,7 @@ add_library(avro
                  stringbuffer.cc
                  deflatedbuffer.cc
                  limiter.cc
+                 filehandler.cc
                  
 # TODO: move to subfolder
                  node/array.cc

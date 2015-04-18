@@ -9,10 +9,17 @@ else()
     message( FATAL_ERROR "Unable to find Boost libraries")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -pedantic -Wall -Werror -Wno-unused-local-typedefs -O3")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -flto")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z -pedantic -Wall -Werror -O3")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
 
-# include_directories ("${PROJECT_SOURCE_DIR}/avro")
+if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs")
+endif()
+
+if (NOT APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+endif()
+
 add_subdirectory (avro) 
 
 add_executable(avroq main.cc)
