@@ -5,6 +5,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include <iostream>
+
 #include "filehandler.h"
 
 
@@ -24,12 +26,13 @@ FileHandle::FileHandle(const std::string &filename) {
 }
 
 FileHandle::~FileHandle() {
+    if (mmappedFile && (mmappedFile != MAP_FAILED)) {
+        int res = munmap((void*)mmappedFile, (fileLength/4096 + 1) * 4096);
+        assert(res == 0);
+        mmappedFile = nullptr;
+    }
     if (fd != -1) {
         close(fd);
-    }
-    if (mmappedFile && mmappedFile != MAP_FAILED) {
-        munmap((void*)mmappedFile, (fileLength/4096 + 1) * 4096);
-        mmappedFile = nullptr;
     }
 }
 
@@ -37,7 +40,7 @@ std::unique_ptr<StringBuffer> FileHandle::mmapFile() {
 
     size_t len = (fileLength/4096 + 1) * 4096;
 
-    auto mmappedFile =
+    mmappedFile =
         (const char *)mmap(nullptr, len, PROT_READ, MAP_PRIVATE, fd, 0);
 
     if (mmappedFile == MAP_FAILED) {
