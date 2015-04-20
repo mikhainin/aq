@@ -206,6 +206,9 @@ public:
         std::cout << indents[level] << "}\n";
     }
 
+    void EndDocument() {
+    }
+
 private:
     int level = 0;
 
@@ -232,11 +235,26 @@ private:
 
 class TsvDumper {
 public:
-    TsvDumper(const std::map<int, int> &whatDump) : whatDump(whatDump) {
+    TsvDumper(const TsvExpression &wd) : whatDump(wd) {
+    	toDump.resize(whatDump.pos);
+    	// std::cout << "TsvDumper() " << whatDump.what.size() << std::endl;
+    }
+
+    template<typename T, typename NodeType>
+    void addIfNecessary(const T &t, const NodeType &n) {
+        // std::cout << "sz " << whatDump.what.size() << std::endl;
+    	auto p = whatDump.what.find(n.getNumber());
+    	if (p != whatDump.what.end()) {
+            // std::cout << "adding " << n.getItemName() << " num=" << n.getNumber() << " pos = " << p->second << std::endl;
+
+    		toDump[p->second].reset(new TDumper<T>(t));
+    	} else {
+            // std::cout << "NOT adding " << n.getItemName() << " num=" << n.getNumber() << " pos = " << p->second << " addIfNecessary() " << whatDump.what.size() << std::endl;
+    	}
     }
 
     void String(const StringBuffer &s, const node::String &n) {
-        toDump.emplace_back(std::unique_ptr<Dumper>(new TDumper<StringBuffer>(s)));
+    	addIfNecessary(s, n);
     }
 
     void MapName(const StringBuffer &s, const node::String &n) {
@@ -248,82 +266,80 @@ public:
     }
 
     void Int(int i, const node::Int &n) {
-        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << i << std::endl;
+    	addIfNecessary(i, n);
     }
 
     void Long(long l, const node::Long &n) {
-        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << l << std::endl;
+    	addIfNecessary(l, n);
     }
 
     void Float(float f, const node::Float &n) {
-        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << f << std::endl;
+    	addIfNecessary(f, n);
     }
 
     void Double(double d, const node::Double &n) {
-        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << d << std::endl;
+    	addIfNecessary(d, n);
     }
 
     void Boolean(bool b, const node::Boolean &n) {
-        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << b << std::endl;
+    	addIfNecessary(b, n);
     }
 
     void Null(const node::Null &n) {
-        //std::cout << indents[level] << n.getItemName() << ": null" << std::endl;
+    	addIfNecessary(std::string("null"), n);
+    }
+
+    void Union(int index, const node::Union &n) {
+
     }
 
     void RecordBegin(const node::Record &r) {
-        //std::cout << "{\n";
-        //level++;
     }
 
     void RecordEnd(const node::Record &r) {
-        //--level;
-        //std::cout << indents[level] << "}\n";
     }
 
     void ArrayBegin(const node::Array &a) {
-        //std::cout << "[\n";
-        //level++;
-
     }
 
     void ArrayEnd(const node::Array &a) {
-        //level--;
-        //std::cout << indents[level] << "]\n";
     }
 
     void CustomBegin(const node::Custom &c) {
-        //std::cout << indents[level] << c.getItemName();
     }
 
     void Enum(const node::Enum &e, int index) {
-        //const auto &value = e[index];
-        //std::cout << ": \"" << value  << '"' << std::endl;
+    	addIfNecessary(e[index], e);
     }
 
     void MapBegin(const node::Map &m) {
-        //std::cout << "{\n";
-        //level++;
     }
 
     void MapEnd(const node::Map &m) {
-        //level--;
-        //std::cout << indents[level] << "}\n";
     }
 
     void EndDocument() {
-
+    	auto p = toDump.begin();
+    	(*p)->dump(std::cout);
+    	// std::cout << *p;
+    	++p;
+    	while(p != toDump.end()) {
+    		std::cout << "\t";
+    		(*p)->dump(std::cout);
+    		++p;
+    	}
+    	std::cout << std::endl;
     }
 
 private:
     std::vector<std::unique_ptr<Dumper>> toDump;
-    std::map<int, int> whatDump;
+    const TsvExpression &whatDump;
 };
 
 
 
 
-void Reader::readBlock(const header &header, const FilterExpression *filter, std::map<int, int> wd) {
+void Reader::readBlock(const header &header, const FilterExpression *filter, const TsvExpression &wd) {
 
     int64_t objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
@@ -337,15 +353,16 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, std
             // TODO: implement counter as a filter  
             if (!filter) {
                 // dumpDocument(d->deflate_buffer, header.schema, 0);
-                if (wd.size() > 0) {
+                if (wd.pos > 0) {
                     auto dumper = TsvDumper(wd);
+                    // std::cout << "readBlock " << wd.what.size() << std::endl;
                     writeDocument(d->deflate_buffer, header.schema, dumper);
+                    dumper.EndDocument();
                 } else {
                     auto dumper = DocumentDumper();
                     writeDocument(d->deflate_buffer, header.schema, dumper);
+                    dumper.EndDocument();
                 }
-                auto dumper = DocumentDumper();
-                writeDocument(d->deflate_buffer, header.schema, dumper);
                 d->limit.documentFinished();
             } else {
                 try {
@@ -353,7 +370,17 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, std
                     decodeBlock(d->deflate_buffer, header.schema, filter);
                 } catch (const DumpObject &e) {
                     d->deflate_buffer.resetToDocument();
-                    dumpDocument(d->deflate_buffer, header.schema, 0);
+                    if (wd.pos > 0) {
+                        auto dumper = TsvDumper(wd);
+                        // std::cout << "readBlock " << wd.what.size() << std::endl;
+                        writeDocument(d->deflate_buffer, header.schema, dumper);
+                        dumper.EndDocument();
+                    } else {
+                        auto dumper = DocumentDumper();
+                        writeDocument(d->deflate_buffer, header.schema, dumper);
+                        dumper.EndDocument();
+                    	/// dumpDocument(d->deflate_buffer, header.schema, 0);
+                    }
                     d->limit.documentFinished();
                 }
             }
@@ -711,19 +738,32 @@ bool Reader::readBoolean(DeflatedBuffer &input) {
     return c == 1;
 }
 
-std::map<int, int> Reader::compileFieldsList(const std::string &filedList, const header &header) {
+TsvExpression Reader::compileFieldsList(const std::string &filedList, const header &header) {
 
     std::vector<std::string> fields;
     boost::algorithm::split(fields, filedList, boost::is_any_of(","));
 
-    std::map<int, int> result;
-    int pos = 0;
-    for(auto p = fields.begin(); p != fields.end(); ++p) {
-        const auto node = schemaNodeByPath(*p, header);
-        result[node->getNumber()] = pos;
-        pos++;
+    TsvExpression result;
+    result.pos = 0;
+
+    if (filedList.empty()) {
+    	return result;
     }
 
+    for(auto p = fields.begin(); p != fields.end(); ++p) {
+        const auto node = schemaNodeByPath(*p, header);
+        result.what[node->getNumber()] = result.pos;
+        if (node->is<node::Union>()) {
+        	for( auto &p : node->as<node::Union>().getChildren()) {
+        		result.what[p->getNumber()] = result.pos;
+        		// std::cout << p->getItemName() << ':' << p->getTypeName() << " num=" << p->getNumber() << " pos = " << result.pos << std::endl;
+        	}
+        }
+        // std::cout << node->getItemName() << ':' << node->getTypeName() << " num=" << node->getNumber() << " pos = " << result.pos << std::endl;
+        result.pos++;
+    }
+
+    // std::cout << "compile " << result.what.size() << std::endl;
     return result;
 
 }
@@ -755,7 +795,7 @@ FilterExpression Reader::compileCondition(const std::string &what, const std::st
     } else {
         std::cout << "Unsupported type: " << currentNode->getTypeName() << " name=" <<currentNode->getItemName() << std::endl;
 
-        throw PathNotFound();
+        throw PathNotFound(what);
     }
 
     result.shemaItem = currentNode;
@@ -786,13 +826,13 @@ const Node *Reader::schemaNodeByPath(const std::string &path, const header &head
                 }
             }
             // std::cout << " not found " << *p << std::endl;
-            throw PathNotFound();
+            throw PathNotFound(path);
         } else {
-            std::cout << "Can't find path" << std::endl;
-            throw PathNotFound();
+            // std::cout << "Can't find path" << std::endl;
+            throw PathNotFound(path);
         }
 
-        throw PathNotFound();
+        throw PathNotFound(path);
 next://
         (void)currentNode;
     }

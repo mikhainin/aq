@@ -69,6 +69,7 @@ int main(int argc, const char * argv[]) {
                 try {
                     while (not reader.eof()) {
                         if (condition.size() > 0) {
+                            // std::cout << "main " << wd.what.size() << std::endl;
                             reader.readBlock(header, &filter, wd);
                         } else {
                             reader.readBlock(header, nullptr, wd);
@@ -80,6 +81,8 @@ int main(int argc, const char * argv[]) {
             }
         } catch (const avro::Finished &e) {
             ;
+        } catch (const avro::Reader::PathNotFound &e) {
+        	std::cout << "can't locate pach" << e.getPath() << std::endl;
         }
 
     } else {

@@ -39,9 +39,12 @@ struct FilterExpression {
         bool b;
     } value;
     std::string strValue;
-    //FilterExpression() : value(0) {
-        // value.i = 0;
-    //}
+};
+
+
+struct TsvExpression {
+	std::map<int, int> what;
+	int pos = 0;
 };
 
 class Reader {
@@ -49,7 +52,16 @@ public:
 
     // class Eof {};
 
-    class PathNotFound {};
+    class PathNotFound {
+    public:
+    	PathNotFound(const std::string &path) : path(path) {
+    	}
+    	const std::string &getPath() const {
+    		return path;
+    	}
+    private:
+    	std::string path;
+    };
 
     class DumpObject {};
 
@@ -58,10 +70,10 @@ public:
 
     header readHeader();
 
-    void readBlock(const header &header, const FilterExpression *filter, std::map<int, int> wd);
+    void readBlock(const header &header, const FilterExpression *filter, const TsvExpression &wd);
 
     FilterExpression compileCondition(const std::string &what, const std::string &condition, const header &header);
-    std::map<int, int> compileFieldsList(const std::string &filedList, const header &header);
+    TsvExpression compileFieldsList(const std::string &filedList, const header &header);
 
     bool eof();
 private:
