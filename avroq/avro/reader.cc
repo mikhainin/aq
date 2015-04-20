@@ -112,8 +112,218 @@ header Reader::readHeader() {
     return header;
 
 }
+    constexpr static const char *indents[] = {
+            "",
+            "\t",
+            "\t\t",
+            "\t\t\t",
+            "\t\t\t\t",
+            "\t\t\t\t\t",
+            "\t\t\t\t\t\t",
+            "\t\t\t\t\t\t\t",
+            "\t\t\t\t\t\t\t\t",
+            "\t\t\t\t\t\t\t\t\t",
+            "\t\t\t\t\t\t\t\t\t\t",
+            "\t\t\t\t\t\t\t\t\t\t\t",
+            "\t\t\t\t\t\t\t\t\t\t\t\t",
+        };
 
-void Reader::readBlock(const header &header, const FilterExpression *filter) {
+class DocumentDumper {
+public:
+    void String(const StringBuffer &s, const node::String &n) {
+        std::cout << indents[level] << n.getItemName() << ": \"" << s << '"' << std::endl;
+    }
+
+    void MapName(const StringBuffer &s, const node::String &n) {
+        std::cout << indents[level] << s;
+    }
+
+    void MapValue(const StringBuffer &s, const node::String &n) {
+        std::cout << ": \"" << s  << "\"" << std::endl;
+    }
+
+    void Int(int i, const node::Int &n) {
+        std::cout << indents[level] << n.getItemName() << ':' << ' ' << i << std::endl;
+    }
+
+    void Long(long l, const node::Long &n) {
+        std::cout << indents[level] << n.getItemName() << ':' << ' ' << l << std::endl;
+    }
+
+    void Float(float f, const node::Float &n) {
+        std::cout << indents[level] << n.getItemName() << ':' << ' ' << f << std::endl;
+    }
+
+    void Double(double d, const node::Double &n) {
+        std::cout << indents[level] << n.getItemName() << ':' << ' ' << d << std::endl;
+    }
+
+    void Boolean(bool b, const node::Boolean &n) {
+        std::cout << indents[level] << n.getItemName() << ':' << ' ' << b << std::endl;
+    }
+
+    void Null(const node::Null &n) {
+        std::cout << indents[level] << n.getItemName() << ": null" << std::endl;
+    }
+
+    void RecordBegin(const node::Record &r) {
+        std::cout << "{\n";
+        level++;
+    }
+
+    void RecordEnd(const node::Record &r) {
+        --level;
+        std::cout << indents[level] << "}\n";
+    }
+
+    void ArrayBegin(const node::Array &a) {
+        std::cout << "[\n";
+        level++;
+
+    }
+
+    void ArrayEnd(const node::Array &a) {
+        level--;
+        std::cout << indents[level] << "]\n";
+    }
+
+    void CustomBegin(const node::Custom &c) {
+        std::cout << indents[level] << c.getItemName();
+    }
+
+    void Enum(const node::Enum &e, int index) {
+        const auto &value = e[index];
+        std::cout << ": \"" << value  << '"' << std::endl;
+    }
+
+    void MapBegin(const node::Map &m) {
+        std::cout << "{\n";
+        level++;
+    }
+
+    void MapEnd(const node::Map &m) {
+        level--;
+        std::cout << indents[level] << "}\n";
+    }
+
+private:
+    int level = 0;
+
+};
+
+class Dumper {
+public:
+    virtual ~Dumper() {}
+    virtual void dump(std::ostream &os) = 0;
+};
+
+template<typename T>
+class TDumper : public Dumper {
+public:
+
+    TDumper(const T &t) : Dumper(), t(t) {
+    }
+    void dump(std::ostream &os) {
+        os << t;
+    }
+private:
+    T t;
+};
+
+class TsvDumper {
+public:
+    TsvDumper(const std::map<int, int> &whatDump) : whatDump(whatDump) {
+    }
+
+    void String(const StringBuffer &s, const node::String &n) {
+        toDump.emplace_back(std::unique_ptr<Dumper>(new TDumper<StringBuffer>(s)));
+    }
+
+    void MapName(const StringBuffer &s, const node::String &n) {
+        // std::cout << indents[level] << s;
+    }
+
+    void MapValue(const StringBuffer &s, const node::String &n) {
+        //std::cout << ": \"" << s  << "\"" << std::endl;
+    }
+
+    void Int(int i, const node::Int &n) {
+        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << i << std::endl;
+    }
+
+    void Long(long l, const node::Long &n) {
+        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << l << std::endl;
+    }
+
+    void Float(float f, const node::Float &n) {
+        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << f << std::endl;
+    }
+
+    void Double(double d, const node::Double &n) {
+        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << d << std::endl;
+    }
+
+    void Boolean(bool b, const node::Boolean &n) {
+        //std::cout << indents[level] << n.getItemName() << ':' << ' ' << b << std::endl;
+    }
+
+    void Null(const node::Null &n) {
+        //std::cout << indents[level] << n.getItemName() << ": null" << std::endl;
+    }
+
+    void RecordBegin(const node::Record &r) {
+        //std::cout << "{\n";
+        //level++;
+    }
+
+    void RecordEnd(const node::Record &r) {
+        //--level;
+        //std::cout << indents[level] << "}\n";
+    }
+
+    void ArrayBegin(const node::Array &a) {
+        //std::cout << "[\n";
+        //level++;
+
+    }
+
+    void ArrayEnd(const node::Array &a) {
+        //level--;
+        //std::cout << indents[level] << "]\n";
+    }
+
+    void CustomBegin(const node::Custom &c) {
+        //std::cout << indents[level] << c.getItemName();
+    }
+
+    void Enum(const node::Enum &e, int index) {
+        //const auto &value = e[index];
+        //std::cout << ": \"" << value  << '"' << std::endl;
+    }
+
+    void MapBegin(const node::Map &m) {
+        //std::cout << "{\n";
+        //level++;
+    }
+
+    void MapEnd(const node::Map &m) {
+        //level--;
+        //std::cout << indents[level] << "}\n";
+    }
+
+    void EndDocument() {
+
+    }
+
+private:
+    std::vector<std::unique_ptr<Dumper>> toDump;
+    std::map<int, int> whatDump;
+};
+
+
+
+
+void Reader::readBlock(const header &header, const FilterExpression *filter, std::map<int, int> wd) {
 
     int64_t objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
@@ -126,7 +336,16 @@ void Reader::readBlock(const header &header, const FilterExpression *filter) {
             // TODO: rewrite it using hierarcy of filters/decoders.
             // TODO: implement counter as a filter  
             if (!filter) {
-                dumpDocument(d->deflate_buffer, header.schema, 0);
+                // dumpDocument(d->deflate_buffer, header.schema, 0);
+                if (wd.size() > 0) {
+                    auto dumper = TsvDumper(wd);
+                    writeDocument(d->deflate_buffer, header.schema, dumper);
+                } else {
+                    auto dumper = DocumentDumper();
+                    writeDocument(d->deflate_buffer, header.schema, dumper);
+                }
+                auto dumper = DocumentDumper();
+                writeDocument(d->deflate_buffer, header.schema, dumper);
                 d->limit.documentFinished();
             } else {
                 try {
@@ -226,13 +445,100 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
         }
     }
 }
+template <class T>
+void Reader::writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper) {
+    if (schema->is<node::Record>()) {
+
+        auto &r = schema->as<node::Record>();
+        dumper.RecordBegin(r);
+        for(auto &p : schema->as<node::Record>().getChildren()) {
+            writeDocument(stream, p, dumper);
+        }
+        dumper.RecordEnd(r);
+
+    } else if (schema->is<node::Union>()) {
+        int item = readZigZagLong(stream);
+        const auto &node = schema->as<node::Union>().getChildren()[item];
+        writeDocument(stream, node, dumper);
+    } else if (schema->is<node::Custom>()) {
+        dumper.CustomBegin(schema->as<node::Custom>());
+        writeDocument(stream, schema->as<node::Custom>().getDefinition(), dumper);
+    } else if (schema->is<node::Enum>()) {
+        int index = readZigZagLong(stream);
+        dumper.Enum(schema->as<node::Enum>(), index);
+
+    } else if (schema->is<node::Array>()) {
+        auto &a = schema->as<node::Array>();
+        auto const &node = a.getItemsType();
+
+        dumper.ArrayBegin(a);
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = readZigZagLong(stream);
+            for(int i = 0; i < objectsInBlock; ++i) {
+                writeDocument(stream, node, dumper);
+            }
+        } while(objectsInBlock != 0);
+        dumper.ArrayEnd(a);
+
+    } else if (schema->is<node::Map>()) {
+        auto &m = schema->as<node::Map>();
+        auto const &node = m.getItemsType();
+
+        assert(node->is<node::String>());
+        dumper.MapBegin(m);
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = readZigZagLong(stream);
+
+            for(int i = 0; i < objectsInBlock; ++i) {
+                const auto & name  = stream.getString(readZigZagLong(stream));
+                const auto & value = stream.getString(readZigZagLong(stream));
+                dumper.MapName(name, node->as<node::String>());
+                dumper.MapValue(value, node->as<node::String>());
+                // writeDocument(stream, node, dumper);
+            }
+        } while(objectsInBlock != 0);
+        dumper.MapEnd(m);
+
+    } else {
+        if (schema->is<node::String>()) {
+            dumper.String(stream.getString(readZigZagLong(stream)), schema->as<node::String>());
+        } else if (schema->is<node::Int>()) {
+            int value = readZigZagLong(stream);
+            dumper.Int(value, schema->as<node::Int>());
+            // std::cout << schema->getItemName() << ": " << value << std::endl;
+        } else if (schema->is<node::Long>()) {
+            long value = readZigZagLong(stream);
+            dumper.Long(value, schema->as<node::Long>());
+            // std::cout << schema->getItemName() << ": " << value << std::endl;
+        } else if (schema->is<node::Float>()) {
+            // readFloat(stream);
+            // std::cout << schema->getItemName() << ": " << readFloat(stream) << std::endl;
+            float value = readFloat(stream);
+            dumper.Float(value, schema->as<node::Float>());
+        } else if (schema->is<node::Double>()) {
+            // std::cout << schema->getItemName() << ": " << readDouble(stream) << std::endl;
+            double value = readDouble(stream);
+            dumper.Double(value, schema->as<node::Double>());
+        } else if (schema->is<node::Boolean>()) {
+            // std::cout << schema->getItemName() << ": " << readBoolean(stream) << std::endl;
+            bool value = readBoolean(stream);
+            dumper.Boolean(value, schema->as<node::Boolean>());
+        } else if (schema->is<node::Null>()) {
+            // std::cout << schema->getItemName() << ": null" << std::endl;
+            dumper.Null(schema->as<node::Null>());
+        } else {
+            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+            std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+            throw Eof();
+        }
+    }
+}
+
 
 void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level) {
     if (schema->is<node::Record>()) {
-
-        /*for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        } */
         std::cout << "{\n";
         for(auto &p : schema->as<node::Record>().getChildren()) {
             dumpDocument(stream, p, level + 1);
@@ -242,12 +548,8 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
         }
         std::cout << "}\n";
     } else if (schema->is<node::Union>()) {
-        /*for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        }*/
         int item = readZigZagLong(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
-        // std::cout << "union " << node->getItemName() << ": " << node->getTypeName() << std::endl;
         dumpDocument(stream, node, level);
     } else if (schema->is<node::Custom>()) {
         for(int i = 0; i < level; ++i) {
@@ -409,39 +711,28 @@ bool Reader::readBoolean(DeflatedBuffer &input) {
     return c == 1;
 }
 
+std::map<int, int> Reader::compileFieldsList(const std::string &filedList, const header &header) {
+
+    std::vector<std::string> fields;
+    boost::algorithm::split(fields, filedList, boost::is_any_of(","));
+
+    std::map<int, int> result;
+    int pos = 0;
+    for(auto p = fields.begin(); p != fields.end(); ++p) {
+        const auto node = schemaNodeByPath(*p, header);
+        result[node->getNumber()] = pos;
+        pos++;
+    }
+
+    return result;
+
+}
+
 FilterExpression Reader::compileCondition(const std::string &what, const std::string &condition, const header &header) {
 
     FilterExpression result;
-    std::vector<std::string> chunks;
-    boost::algorithm::split(chunks, what, boost::is_any_of("."));
 
-    auto currentNode = header.schema.get();
-
-    for(auto p = chunks.begin(); p != chunks.end(); ++p) {
-        //std::cout << "XX " << *p << std::endl;
-        if (currentNode->is<node::Custom>()) {
-            currentNode = currentNode->as<node::Custom>().getDefinition().get();
-        }
-        if (currentNode->is<node::Record>()) {
-            for( auto &n : currentNode->as<node::Record>().getChildren()) {
-                //std::cout << "checking " << n->getItemName() << std::endl;
-                if (n->getItemName() == *p) {
-                    //std::cout << " found " << *p << std::endl;
-                    currentNode = n.get();
-                    goto next;
-                }
-            }
-            // std::cout << " not found " << *p << std::endl;
-            throw PathNotFound();
-        } else {
-            std::cout << "Can't find path" << std::endl;
-            throw PathNotFound();
-        }
-
-        throw PathNotFound();
-next://
-        (void)currentNode;
-    }
+    auto currentNode = schemaNodeByPath(what, header);
 
     if (currentNode->is<node::String>()) {
         result.strValue = condition;
@@ -474,6 +765,40 @@ next://
     return result;
 }
 
+const Node *Reader::schemaNodeByPath(const std::string &path, const header &header) {
+    std::vector<std::string> chunks;
+    boost::algorithm::split(chunks, path, boost::is_any_of("."));
+
+    auto currentNode = header.schema.get();
+
+    for(auto p = chunks.begin(); p != chunks.end(); ++p) {
+        //std::cout << "XX " << *p << std::endl;
+        if (currentNode->is<node::Custom>()) {
+            currentNode = currentNode->as<node::Custom>().getDefinition().get();
+        }
+        if (currentNode->is<node::Record>()) {
+            for( auto &n : currentNode->as<node::Record>().getChildren()) {
+                //std::cout << "checking " << n->getItemName() << std::endl;
+                if (n->getItemName() == *p) {
+                    //std::cout << " found " << *p << std::endl;
+                    currentNode = n.get();
+                    goto next;
+                }
+            }
+            // std::cout << " not found " << *p << std::endl;
+            throw PathNotFound();
+        } else {
+            std::cout << "Can't find path" << std::endl;
+            throw PathNotFound();
+        }
+
+        throw PathNotFound();
+next://
+        (void)currentNode;
+    }
+
+    return currentNode;
+}
 
 }
 

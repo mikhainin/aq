@@ -3,6 +3,7 @@
 #define __avroq__stringbuffer__
 
 #include <cstddef>
+#include <ostream>
 #include <string>
 
 namespace avro {
@@ -22,11 +23,24 @@ public:
         return length <= pointer;
     }
 
+    inline
+    std::ostream& write(std::ostream& os) const
+    {
+        os.write(c, length);
+        return os;
+    }
+
 private:
     const char *c = nullptr;
     size_t length = 0;
     size_t pointer = 0;
 };
+
+inline
+std::ostream& operator<<(std::ostream& os, const StringBuffer& s)
+{
+    return s.write(os);
+}
 
 }
 

@@ -12,13 +12,18 @@ public:
     virtual ~Node();
 
     template<class T>
-    inline bool is() {
-        return dynamic_cast<T*>(this) != nullptr;
+    inline bool is() const {
+        return dynamic_cast<const T*>(this) != nullptr;
     }
 
     template<class T>
     inline T& as() {
         return dynamic_cast<T&>(*this);
+    }
+
+    template<class T>
+    inline const T& as() const {
+        return dynamic_cast<const T&>(*this);
     }
 
     const std::string &getTypeName() const;

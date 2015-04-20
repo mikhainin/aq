@@ -21,7 +21,8 @@ if (NOT APPLE)
 endif()
 
 add_subdirectory (avro) 
+add_subdirectory (filter)
 
 add_executable(avroq main.cc)
 
-target_link_libraries (avroq avro ${Boost_LIBRARIES} z)
+target_link_libraries (avroq avro filter ${Boost_LIBRARIES} z)

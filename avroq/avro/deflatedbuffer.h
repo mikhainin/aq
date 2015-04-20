@@ -49,6 +49,7 @@ public:
     void resetToDocument();
     
     std::string getStdString(size_t len);
+    StringBuffer getString(size_t len);
 
 private:
     std::vector<uint8_t> buf;

@@ -22,13 +22,16 @@ int main(int argc, const char * argv[]) {
     std::string condition;
     std::string what;
     int limit = -1;
+    std::string fields;
+
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help,h", "Show help message")
         ("input-file,f", po::value< std::vector<std::string> >(), "input files")
         ("what,w", po::value< std::string >(&what), "what")
         ("condition,c", po::value< std::string >(&condition), "expression")
-        ("limit,n", po::value< int >(&limit)->default_value(-1), "maximum number of records (default -1 means no limit")
+        ("limit,n", po::value< int >(&limit)->default_value(-1), "maximum number of records (default -1 means no limit)")
+        ("fields,l", po::value< std::string >(&fields), "fields to output (order is not preserverd YET)")
     ;
     po::positional_options_description p;
     p.add("input-file", -1);
@@ -56,6 +59,9 @@ int main(int argc, const char * argv[]) {
                 avro::header header = reader.readHeader();
 
                 avro::FilterExpression filter;
+
+                auto wd = reader.compileFieldsList(fields, header);
+
                 if (condition.size() > 0) {
                     filter = reader.compileCondition(what, condition, header);
                 }
@@ -63,9 +69,9 @@ int main(int argc, const char * argv[]) {
                 try {
                     while (not reader.eof()) {
                         if (condition.size() > 0) {
-                            reader.readBlock(header, &filter);
+                            reader.readBlock(header, &filter, wd);
                         } else {
-                            reader.readBlock(header);
+                            reader.readBlock(header, nullptr, wd);
                         }
                     }
                 } catch (const avro::Eof &e) {

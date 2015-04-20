@@ -30,7 +30,7 @@ struct header {
 
 struct FilterExpression {
     std::string what;
-    Node *shemaItem;
+    const Node *shemaItem;
     union {
         long i;
         // std::string s;
@@ -58,9 +58,10 @@ public:
 
     header readHeader();
 
-    void readBlock(const header &header, const FilterExpression *filter = nullptr);
+    void readBlock(const header &header, const FilterExpression *filter, std::map<int, int> wd);
 
     FilterExpression compileCondition(const std::string &what, const std::string &condition, const header &header);
+    std::map<int, int> compileFieldsList(const std::string &filedList, const header &header);
 
     bool eof();
 private:
@@ -78,6 +79,11 @@ private:
     void decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter);
 
     void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
+
+    template <class T>
+    void writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper);
+
+    const Node* schemaNodeByPath(const std::string &path, const header &header);
 };
 
 }
