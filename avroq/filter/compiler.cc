@@ -153,7 +153,7 @@ namespace client
     {
         typedef void result_type;
 
-        void operator()(qi::info::nil) const {}
+        // void operator()(qi::info::nil) const {}
         void operator()(int n) const { std::cout << n; }
         void operator()(const std::string &s) const { std::cout << s; }
         void operator()(const nil &) const { std::cout << "/nil/"; }
