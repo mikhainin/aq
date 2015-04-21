@@ -52,7 +52,7 @@ int main(int argc, const char * argv[]) {
             avro::Limiter limiter(limit);
             for(const auto &p : vm["input-file"].as< std::vector<std::string> >()) {
 
-                std::cout << "Processing " << p << std::endl;
+                std::cerr << "Processing " << p << std::endl;
 
                 avro::Reader reader(p, limiter);
                 
@@ -82,11 +82,11 @@ int main(int argc, const char * argv[]) {
         } catch (const avro::Finished &e) {
             ;
         } catch (const avro::Reader::PathNotFound &e) {
-        	std::cout << "can't locate pach" << e.getPath() << std::endl;
+        	std::cerr << "can't locate pach" << e.getPath() << std::endl;
         }
 
     } else {
-        std::cout << "No input files" << std::endl;
+        std::cerr << "No input files" << std::endl;
         return 1;
     }
 
