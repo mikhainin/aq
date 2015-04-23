@@ -1,0 +1,10 @@
+Ready to present:
+=================
+threading
+operators <, > for integers
+operators <, > for doubles
+operators <, > for floats
+operators starts_with, ends_with, contains for strings
+operators == nil, ~= nil
+validate if the field is nullable
+operator ==, ~= for enums
