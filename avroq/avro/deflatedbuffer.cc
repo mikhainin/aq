@@ -67,6 +67,7 @@ void DeflatedBuffer::decompress(const char *compressedData, size_t compressedDat
     } while (ret != Z_STREAM_END);
 
     length = strm.total_out;
+    inflateEnd(&strm);
 }
 
 char DeflatedBuffer::getChar() {
