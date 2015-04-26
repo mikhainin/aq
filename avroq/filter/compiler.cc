@@ -1,6 +1,6 @@
-
-#include "compiler.h"
-
+#include <iostream>
+#include <vector>
+#include <string>
 
 #include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -9,9 +9,9 @@
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_function.hpp>
 
-#include <iostream>
-#include <vector>
-#include <string>
+#include "filter.cc"
+
+#include "compiler.h"
 
 namespace client
 {
@@ -24,7 +24,8 @@ namespace client
     struct binary_op;
     struct unary_op;
     struct nil {};
-
+    struct equality_expression;
+    
     struct expression_ast
     {
         typedef
@@ -32,6 +33,7 @@ namespace client
                 nil
               , int
               , std::string
+              , boost::recursive_wrapper<equality_expression>
               , boost::recursive_wrapper<expression_ast>
               , boost::recursive_wrapper<binary_op>
               , boost::recursive_wrapper<unary_op>
@@ -45,27 +47,63 @@ namespace client
         expression_ast(Expr const& expr)
           : expr(expr) {}
 
-        expression_ast& operator+=(expression_ast const& rhs);
-        expression_ast& operator-=(expression_ast const& rhs);
-        expression_ast& operator*=(expression_ast const& rhs);
-        expression_ast& operator/=(expression_ast const& rhs);
-        expression_ast& operator==(expression_ast const& rhs);
-        expression_ast& operator!=(expression_ast const& rhs);
-        expression_ast& operator&=(expression_ast const& rhs);
-        expression_ast& operator|=(expression_ast const& rhs);
+        expression_ast& operator &=(expression_ast const& rhs);
+        expression_ast& operator |=(expression_ast const& rhs);
 
         type expr;
     };
 
+    struct equality_expression
+    {
+        enum OP {
+            EQ,
+            NE
+        };
+        typedef
+            boost::variant<
+                nil
+              , int
+              , std::string
+            > type;
+
+        equality_expression() {
+        }
+
+        equality_expression(const std::string &ident) :
+            identifier(ident) {
+        }
+
+        equality_expression& operator == (const type &constant) {
+            this->constant = constant;
+            op = EQ;
+            return *this;
+        }
+
+        equality_expression& operator != (const type &constant) {
+            this->constant = constant;
+            op = NE;
+            return *this;
+        }
+
+        type constant;
+        std::string identifier;
+        OP op;
+
+    };
+
     struct binary_op
     {
+        enum OP {
+            AND,
+            OR
+        };
         binary_op(
-            std::string op
+            OP op
           , expression_ast const& left
           , expression_ast const& right)
         : op(op), left(left), right(right) {}
 
-        std::string op;
+        OP op;
         expression_ast left;
         expression_ast right;
     };
@@ -81,70 +119,17 @@ namespace client
         expression_ast subject;
     };
 
-    expression_ast& expression_ast::operator+=(expression_ast const& rhs)
-    {
-        expr = binary_op("plus", expr, rhs);
-        return *this;
-    }
-
-    expression_ast& expression_ast::operator==(expression_ast const& rhs)
-    {
-        expr = binary_op("==", expr, rhs);
-        return *this;
-    }
-
-    expression_ast& expression_ast::operator!=(expression_ast const& rhs)
-    {
-        expr = binary_op("!=", expr, rhs);
-        return *this;
-    }
-
-    expression_ast& expression_ast::operator-=(expression_ast const& rhs)
-    {
-        expr = binary_op("-", expr, rhs);
-        return *this;
-    }
-
-    expression_ast& expression_ast::operator*=(expression_ast const& rhs)
-    {
-        expr = binary_op("*", expr, rhs);
-        return *this;
-    }
-
-    expression_ast& expression_ast::operator/=(expression_ast const& rhs)
-    {
-        expr = binary_op("/", expr, rhs);
-        return *this;
-    }
-
     expression_ast& expression_ast::operator&=(expression_ast const& rhs)
     {
-        expr = binary_op("and", expr, rhs);
+        expr = binary_op(binary_op::AND, expr, rhs);
         return *this;
     }
 
     expression_ast& expression_ast::operator|=(expression_ast const& rhs)
     {
-        expr = binary_op("or", expr, rhs);
+        expr = binary_op(binary_op::OR, expr, rhs);
         return *this;
     }
-
-    // We should be using expression_ast::operator-. There's a bug
-    // in phoenix type deduction mechanism that prevents us from
-    // doing so. Phoenix will be switching to BOOST_TYPEOF. In the
-    // meantime, we will use a phoenix::function below:
-    struct negate_expr
-    {
-        template <typename T>
-        struct result { typedef T type; };
-
-        expression_ast operator()(expression_ast const& expr) const
-        {
-            return expression_ast(unary_op('-', expr));
-        }
-    };
-
-    boost::phoenix::function<negate_expr> neg;
 
     ///////////////////////////////////////////////////////////////////////////
     //  Walk the tree
@@ -153,9 +138,14 @@ namespace client
     {
         typedef void result_type;
 
-        // void operator()(qi::info::nil) const {}
+        void operator()(qi::info::nil) const {}
         void operator()(int n) const { std::cout << n; }
         void operator()(const std::string &s) const { std::cout << s; }
+        void operator()(const equality_expression &s) const {
+            std::cout << s.identifier << (s.op == s.EQ ? "==" : "!=");
+            this->operator()(s.constant);
+        }
+
         void operator()(const nil &) const { std::cout << "/nil/"; }
 
         void operator()(expression_ast const& ast) const
@@ -238,33 +228,51 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             condition =
                   logical_expression                [_val = _1]
                 ;
-            /*
-            expression =
-                term                            [_val = _1]
-                >> *(   ('+' >> term         [_val += _1])
-                    |   ('-' >> term            [_val -= _1])
-                    )
-                ;
-
-            term =
-                factor                          [_val = _1]
-                >> *(   ('*' >> factor          [_val *= _1])
-                    |   ('/' >> factor          [_val /= _1])
-                    )
-                ;
-
-            factor =
-                uint_                           [_val = _1]
-                |   '(' >> expression           [_val = _1] >> ')'
-                |   ('-' >> factor              [_val = neg(_1)])
-                |   ('+' >> factor              [_val = _1])
-                ;
-                */
         }
 
         qi::rule<Iterator, expression_ast(), ascii::space_type>
-        equality_expr, logical_expression, term, factor, constant, condition, braces_expr;
+        logical_expression, condition, braces_expr;
+
+        qi::rule<Iterator, equality_expression::type(), ascii::space_type> constant;
+        qi::rule<Iterator, equality_expression(), ascii::space_type> equality_expr;
         qi::rule<Iterator, std::string(), ascii::space_type> quoted_string;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
     };
+
+}
+
+namespace filter {
+
+std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
+    using boost::spirit::ascii::space;
+    using client::expression_ast;
+    typedef std::string::const_iterator iterator_type;
+    typedef client::calculator<iterator_type> calculator;
+
+    std::string::const_iterator iter = str.begin();
+    std::string::const_iterator end = str.end();
+    expression_ast ast;
+    // ast_print printer;
+    calculator calc; // Our grammar
+    bool r = phrase_parse(iter, end, calc, space, ast);
+
+    if (r && iter == end)
+    {
+        std::cout << "-------------------------\n";
+        std::cout << "Parsing succeeded\n";
+        // printer(ast);
+        std::cout << "\n-------------------------\n";
+    }
+    else
+    {
+        std::string rest(iter, end);
+        std::cout << "-------------------------\n";
+        std::cout << "Parsing failed\n";
+        std::cout << "stopped at: \": " << rest << "\"\n";
+        std::cout << "-------------------------\n";
+    }
+    return std::make_shared<Filter>();
+}
+
+
 }

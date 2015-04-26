@@ -7,4 +7,17 @@ operators <, > for floats
 operators starts_with, ends_with, contains for strings
 operators == nil, ~= nil
 validate if the field is nullable
+validate if the operation is viable for this field
 operator ==, ~= for enums
+
+TODO
+====
+print names/values in columns (to be able to copy field names)
+print as json
+sort fields on output
+
+Long term TODO
+==============
+query JSON
+query protobuf
+print protobuf content
