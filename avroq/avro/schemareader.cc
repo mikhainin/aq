@@ -200,7 +200,6 @@ std::unique_ptr<node::Union> SchemaReader::readUnion(const boost::property_tree:
 void SchemaReader::readEnumValues(const boost::property_tree::ptree &node, node::Enum &e) {
     for(const auto &p : node.get_child("symbols")) {
         e.addValue(p.second.data());
-        std::cout << "enum value" <<p.second.data() << std::endl;
     }
 }
 
