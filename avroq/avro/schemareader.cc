@@ -27,8 +27,15 @@
 
 namespace avro {
 
+static bool isArray(const boost::property_tree::ptree &node);
+
 static bool isObject(const boost::property_tree::ptree &node) {
-    return !node.front().first.empty() && !node.front().second.data().empty();
+    std::cout << node.front().first << ' ' << node.front().first.empty() << ' ' << node.front().second.data().empty() << std::endl;
+    return !node.front().first.empty() && (
+            !node.front().second.data().empty() ||
+            isArray(node.front().second) ||
+            isObject(node.front().second)
+        );
 }
 
 static bool isArray(const boost::property_tree::ptree &node) {
