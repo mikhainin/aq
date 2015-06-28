@@ -30,7 +30,6 @@ namespace avro {
 static bool isArray(const boost::property_tree::ptree &node);
 
 static bool isObject(const boost::property_tree::ptree &node) {
-    std::cout << node.front().first << ' ' << node.front().first.empty() << ' ' << node.front().second.data().empty() << std::endl;
     return !node.front().first.empty() && (
             !node.front().second.data().empty() ||
             isArray(node.front().second) ||
@@ -207,7 +206,6 @@ std::unique_ptr<node::Union> SchemaReader::readUnion(const boost::property_tree:
 void SchemaReader::readEnumValues(const boost::property_tree::ptree &node, node::Enum &e) {
     for(const auto &p : node.get_child("symbols")) {
         e.addValue(p.second.data());
-        std::cout << "enum value" <<p.second.data() << std::endl;
     }
 }
 
