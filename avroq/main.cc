@@ -4,12 +4,15 @@
 
 #include <boost/program_options.hpp>
 
-// TODO: remove this include (node.h) from this file
-#include "avro/node/node.h"
 #include "avro/reader.h"
 #include "avro/eof.h"
 #include "avro/finished.h"
 #include "avro/limiter.h"
+// TODO: remove this include (node.h) from this file
+#include "avro/node/node.h"
+
+#include "filter/filter.h"
+#include "filter/compiler.h"
 
 namespace po = boost::program_options;
 
@@ -46,6 +49,10 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
 
+    filter::Compiler filterCompiler;
+    if (!condition.empty()) {
+        filterCompiler.compile(condition);
+    }
 
     if (vm.count("input-file")) {
         try {
@@ -82,7 +89,7 @@ int main(int argc, const char * argv[]) {
         } catch (const avro::Finished &e) {
             ;
         } catch (const avro::Reader::PathNotFound &e) {
-        	std::cerr << "can't locate pach" << e.getPath() << std::endl;
+        	std::cerr << "can't locate path" << e.getPath() << std::endl;
         }
 
     } else {

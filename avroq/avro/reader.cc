@@ -134,12 +134,16 @@ public:
         std::cout << indents[level] << n.getItemName() << ": \"" << s << '"' << std::endl;
     }
 
-    void MapName(const StringBuffer &s, const node::String &n) {
-        std::cout << indents[level] << s;
+    void MapName(const StringBuffer &name) {
+        std::cout << indents[level] << name;
     }
 
     void MapValue(const StringBuffer &s, const node::String &n) {
-        std::cout << ": \"" << s  << "\"" << std::endl;
+        std::cout << ": \"" << s << "\"" << std::endl;
+    }
+
+    void MapValue(int i, const node::Int &n) {
+        std::cout << ": " << i << std::endl;
     }
 
     void Int(int i, const node::Int &n) {
@@ -257,11 +261,14 @@ public:
     	addIfNecessary(s, n);
     }
 
-    void MapName(const StringBuffer &s, const node::String &n) {
+    void MapName(const StringBuffer &name) {
         // std::cout << indents[level] << s;
     }
 
     void MapValue(const StringBuffer &s, const node::String &n) {
+        //std::cout << ": \"" << s  << "\"" << std::endl;
+    }
+    void MapValue(int i, const node::Int &n) {
         //std::cout << ": \"" << s  << "\"" << std::endl;
     }
 
@@ -512,7 +519,8 @@ void Reader::writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &
         auto &m = schema->as<node::Map>();
         auto const &node = m.getItemsType();
 
-        assert(node->is<node::String>());
+        // TODO: refactor this trash
+        assert(node->is<node::String>() || node->is<node::Int>());
         dumper.MapBegin(m);
         int objectsInBlock = 0;
         do {
@@ -520,14 +528,19 @@ void Reader::writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &
 
             for(int i = 0; i < objectsInBlock; ++i) {
                 const auto & name  = stream.getString(readZigZagLong(stream));
-                const auto & value = stream.getString(readZigZagLong(stream));
-                dumper.MapName(name, node->as<node::String>());
-                dumper.MapValue(value, node->as<node::String>());
-                // writeDocument(stream, node, dumper);
+                dumper.MapName(name);
+
+                // TODO: refactor this trash
+                if (node->is<node::String>()) {
+                    const auto & value = stream.getString(readZigZagLong(stream));
+                    dumper.MapValue(value, node->as<node::String>());
+                } else if (node->is<node::Int>()) {
+                     const auto & value = readZigZagLong(stream);
+                    dumper.MapValue(value, node->as<node::Int>());
+               }
             }
         } while(objectsInBlock != 0);
         dumper.MapEnd(m);
-
     } else {
         if (schema->is<node::String>()) {
             dumper.String(stream.getString(readZigZagLong(stream)), schema->as<node::String>());
