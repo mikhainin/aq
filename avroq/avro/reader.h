@@ -15,6 +15,11 @@
 
 #include <boost/iostreams/filtering_stream.hpp>
 
+#include "stringbuffer.h"
+namespace filter {
+    class Filter;
+}
+
 namespace avro {
 
 class Node;
@@ -75,6 +80,8 @@ public:
     FilterExpression compileCondition(const std::string &what, const std::string &condition, const header &header);
     TsvExpression compileFieldsList(const std::string &filedList, const header &header);
 
+    void setFilter(std::shared_ptr<filter::Filter> filter, const header &header);
+
     bool eof();
 private:
 
@@ -83,17 +90,20 @@ private:
 
     // int64_t readLong(std::istream &input);
     std::string readString(DeflatedBuffer &input);
+    StringBuffer readStringBuffer(DeflatedBuffer &input);
+    void skipString(DeflatedBuffer &input);
+    void skipInt(DeflatedBuffer &input);
     float readFloat(DeflatedBuffer &input);
     double readDouble(DeflatedBuffer &input);
     bool readBoolean(DeflatedBuffer &input);
 
     void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
-    void decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter);
+    void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter);
 
-    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
+    //void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
 
     template <class T>
-    void writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper);
+    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper);
 
     const Node* schemaNodeByPath(const std::string &path, const header &header);
 };

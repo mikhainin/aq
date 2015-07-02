@@ -8,7 +8,7 @@
 #include "avro/eof.h"
 #include "avro/finished.h"
 #include "avro/limiter.h"
-// TODO: remove this include (node.h) from this file
+// TODO: remove this include (node.h) from this file as it's an implementation detail
 #include "avro/node/node.h"
 
 #include "filter/filter.h"
@@ -50,9 +50,7 @@ int main(int argc, const char * argv[]) {
     }
 
     filter::Compiler filterCompiler;
-    if (!condition.empty()) {
-        filterCompiler.compile(condition);
-    }
+    std::shared_ptr<filter::Filter> filter;
 
     if (vm.count("input-file")) {
         try {
@@ -65,22 +63,26 @@ int main(int argc, const char * argv[]) {
                 
                 avro::header header = reader.readHeader();
 
-                avro::FilterExpression filter;
+                // avro::FilterExpression filter;
 
                 auto wd = reader.compileFieldsList(fields, header);
 
-                if (condition.size() > 0) {
+                /* if (condition.size() > 0) {
                     filter = reader.compileCondition(what, condition, header);
+                } */
+                if (!condition.empty()) {
+                    filter = filterCompiler.compile(condition);
+                    reader.setFilter(filter, header);
                 }
-                
+
                 try {
                     while (not reader.eof()) {
-                        if (condition.size() > 0) {
+                        /*if (condition.size() > 0) {
                             // std::cout << "main " << wd.what.size() << std::endl;
                             reader.readBlock(header, &filter, wd);
-                        } else {
+                        } else {*/
                             reader.readBlock(header, nullptr, wd);
-                        }
+                        //}
                     }
                 } catch (const avro::Eof &e) {
                     ; // reading done

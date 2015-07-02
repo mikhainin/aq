@@ -8,6 +8,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
+#include <unordered_map>
 
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
@@ -15,6 +16,9 @@
 #include <boost/algorithm/string.hpp>
 
 #include <boost/lexical_cast.hpp>
+
+#include <filter/filter.h>
+#include <filter/equality_expression.h>
 
 #include "schemareader.h"
 #include "limiter.h"
@@ -36,6 +40,7 @@
 
 #include "deflatedbuffer.h"
 #include "filehandler.h"
+#include "predicate/predicate.h"
 #include "stringbuffer.h"
 #include "zigzag.hpp"
 #include "reader.h"
@@ -56,6 +61,8 @@ public:
     Limiter &limit;
 
     FileHandle file;
+    std::shared_ptr<filter::Filter> filter;
+    std::unordered_map<const Node *, std::shared_ptr<predicate::Predicate>> filterItems;
 
     Private(const std::string& filename, Limiter &limit) : filename(filename), limit(limit), file(filename) {
     }
@@ -112,21 +119,21 @@ header Reader::readHeader() {
     return header;
 
 }
-    constexpr static const char *indents[] = {
-            "",
-            "\t",
-            "\t\t",
-            "\t\t\t",
-            "\t\t\t\t",
-            "\t\t\t\t\t",
-            "\t\t\t\t\t\t",
-            "\t\t\t\t\t\t\t",
-            "\t\t\t\t\t\t\t\t",
-            "\t\t\t\t\t\t\t\t\t",
-            "\t\t\t\t\t\t\t\t\t\t",
-            "\t\t\t\t\t\t\t\t\t\t\t",
-            "\t\t\t\t\t\t\t\t\t\t\t\t",
-        };
+constexpr static const char *indents[] = {
+        "",
+        "\t",
+        "\t\t",
+        "\t\t\t",
+        "\t\t\t\t",
+        "\t\t\t\t\t",
+        "\t\t\t\t\t\t",
+        "\t\t\t\t\t\t\t",
+        "\t\t\t\t\t\t\t\t",
+        "\t\t\t\t\t\t\t\t\t",
+        "\t\t\t\t\t\t\t\t\t\t",
+        "\t\t\t\t\t\t\t\t\t\t\t",
+        "\t\t\t\t\t\t\t\t\t\t\t\t",
+    };
 
 class DocumentDumper {
 public:
@@ -345,6 +352,26 @@ private:
 
 
 
+void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &header) {
+    d->filter = filter;
+
+    for(auto &filterPredicate : filter->getPredicates()) {
+        const Node * filterNode = schemaNodeByPath(filterPredicate->identifier, header);
+
+        if (filterNode->is<node::Union>()) {
+            for( auto &p : filterNode->as<node::Union>().getChildren()) {
+                if (p->is<node::String>()) {
+                    filterNode = p.get();
+                    break;
+                } else if (p->is<node::Int>() || p->is<node::Long>()) {
+                    filterNode = p.get();
+                    break;
+                }
+            }
+        }
+        d->filterItems[filterNode] = std::make_shared<predicate::Predicate>(filterPredicate);
+    }
+}
 
 void Reader::readBlock(const header &header, const FilterExpression *filter, const TsvExpression &wd) {
 
@@ -358,35 +385,46 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
         for(int i = 0; i < objectCountInBlock; ++i) {
             // TODO: rewrite it using hierarcy of filters/decoders.
             // TODO: implement counter as a filter  
-            if (!filter) {
+            if (!filter && false) {
                 // dumpDocument(d->deflate_buffer, header.schema, 0);
                 if (wd.pos > 0) {
                     auto dumper = TsvDumper(wd);
                     // std::cout << "readBlock " << wd.what.size() << std::endl;
-                    writeDocument(d->deflate_buffer, header.schema, dumper);
+                    dumpDocument(d->deflate_buffer, header.schema, dumper);
                     dumper.EndDocument();
                 } else {
                     auto dumper = DocumentDumper();
-                    writeDocument(d->deflate_buffer, header.schema, dumper);
+                    dumpDocument(d->deflate_buffer, header.schema, dumper);
                     dumper.EndDocument();
                 }
                 d->limit.documentFinished();
             } else {
                 try {
                     d->deflate_buffer.startDocument();
-                    decodeBlock(d->deflate_buffer, header.schema, filter);
+                    decodeDocument(d->deflate_buffer, header.schema, filter);
+                    if (d->filter->expressionPassed()) {
+                        d->deflate_buffer.resetToDocument();
+                        if (wd.pos > 0) {
+                            auto dumper = TsvDumper(wd);
+                            dumpDocument(d->deflate_buffer, header.schema, dumper);
+                            dumper.EndDocument();
+                        } else {
+                            auto dumper = DocumentDumper();
+                            dumpDocument(d->deflate_buffer, header.schema, dumper);
+                            dumper.EndDocument();
+                        }
+                        d->limit.documentFinished();
+                    }
                 } catch (const DumpObject &e) {
                     d->deflate_buffer.resetToDocument();
                     if (wd.pos > 0) {
                         auto dumper = TsvDumper(wd);
-                        // std::cout << "readBlock " << wd.what.size() << std::endl;
-                        writeDocument(d->deflate_buffer, header.schema, dumper);
+                        dumpDocument(d->deflate_buffer, header.schema, dumper);
                         dumper.EndDocument();
                     } else {
                         auto dumper = DocumentDumper();
-                        writeDocument(d->deflate_buffer, header.schema, dumper);
+                        dumpDocument(d->deflate_buffer, header.schema, dumper);
                         dumper.EndDocument();
-                    	/// dumpDocument(d->deflate_buffer, header.schema, 0);
                     }
                     d->limit.documentFinished();
                 }
@@ -406,17 +444,17 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
 
 }
 
-void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter) {
+void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter) {
     if (schema->is<node::Record>()) {
         for(auto &p : schema->as<node::Record>().getChildren()) {
-            decodeBlock(stream, p, filter);
+            decodeDocument(stream, p, filter);
         }
     } else if (schema->is<node::Union>()) {
         int item = readZigZagLong(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
-        decodeBlock(stream, node, filter);
+        decodeDocument(stream, node, filter);
     } else if (schema->is<node::Custom>()) {
-        decodeBlock(stream, schema->as<node::Custom>().getDefinition(), filter);
+        decodeDocument(stream, schema->as<node::Custom>().getDefinition(), filter);
     } else if (schema->is<node::Enum>()) {
         int index = readZigZagLong(stream);
         (void)index;
@@ -427,7 +465,7 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
         do {
             objectsInBlock = readZigZagLong(stream);
             for(int i = 0; i < objectsInBlock; ++i) {
-                decodeBlock(stream, node, filter);
+                decodeDocument(stream, node, filter);
             }
         } while(objectsInBlock != 0);
 
@@ -440,29 +478,36 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
 
             for(int i = 0; i < objectsInBlock; ++i) {
                 readString(stream);
-                decodeBlock(stream, node, filter);
+                decodeDocument(stream, node, filter);
             }
         } while(objectsInBlock != 0);
     } else {
         if (schema->is<node::String>()) {
-            const std::string value = readString(stream);
-            if (filter && schema.get() == filter->shemaItem && value == filter->strValue) {
-                // dump ducument
-                throw DumpObject();
+            if (d->filter && d->filterItems.find( schema.get() ) !=  d->filterItems.end()) {
+                const auto &value = readStringBuffer(stream);
+                auto filterItem = d->filterItems.find(schema.get());
+
+                filterItem->second->applyString(value);
+            } else {
+                skipString(stream);
             }
         } else if (schema->is<node::Int>()) {
-            int value = readZigZagLong(stream);
+            if (d->filter && d->filterItems.find( schema.get() ) !=  d->filterItems.end()) {
+                const auto &value = readZigZagLong(stream);
+                auto filterItem = d->filterItems.find(schema.get());
 
-            if (filter && schema.get() == filter->shemaItem && value == filter->value.i) {
-                // dump ducument
-                throw DumpObject();
+                filterItem->second->applyInt(value);
+            } else {
+                skipInt(stream);
             }
         } else if (schema->is<node::Long>()) {
-            int value = readZigZagLong(stream);
+            if (d->filter && d->filterItems.find( schema.get() ) !=  d->filterItems.end()) {
+                const auto &value = readZigZagLong(stream);
+                auto filterItem = d->filterItems.find(schema.get());
 
-            if (filter && schema.get() == filter->shemaItem && value == filter->value.i) {
-                // dump ducument
-                throw DumpObject();
+                filterItem->second->applyInt(value);
+            } else {
+                skipInt(stream);
             }
         } else if (schema->is<node::Float>()) {
             readFloat(stream);
@@ -480,23 +525,23 @@ void Reader::decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &sc
     }
 }
 template <class T>
-void Reader::writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper) {
+void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper) {
     if (schema->is<node::Record>()) {
 
         auto &r = schema->as<node::Record>();
         dumper.RecordBegin(r);
         for(auto &p : schema->as<node::Record>().getChildren()) {
-            writeDocument(stream, p, dumper);
+            dumpDocument(stream, p, dumper);
         }
         dumper.RecordEnd(r);
 
     } else if (schema->is<node::Union>()) {
         int item = readZigZagLong(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
-        writeDocument(stream, node, dumper);
+        dumpDocument(stream, node, dumper);
     } else if (schema->is<node::Custom>()) {
         dumper.CustomBegin(schema->as<node::Custom>());
-        writeDocument(stream, schema->as<node::Custom>().getDefinition(), dumper);
+        dumpDocument(stream, schema->as<node::Custom>().getDefinition(), dumper);
     } else if (schema->is<node::Enum>()) {
         int index = readZigZagLong(stream);
         dumper.Enum(schema->as<node::Enum>(), index);
@@ -510,7 +555,7 @@ void Reader::writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &
         do {
             objectsInBlock = readZigZagLong(stream);
             for(int i = 0; i < objectsInBlock; ++i) {
-                writeDocument(stream, node, dumper);
+                dumpDocument(stream, node, dumper);
             }
         } while(objectsInBlock != 0);
         dumper.ArrayEnd(a);
@@ -576,96 +621,6 @@ void Reader::writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &
     }
 }
 
-
-void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level) {
-    if (schema->is<node::Record>()) {
-        std::cout << "{\n";
-        for(auto &p : schema->as<node::Record>().getChildren()) {
-            dumpDocument(stream, p, level + 1);
-        }
-        for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        }
-        std::cout << "}\n";
-    } else if (schema->is<node::Union>()) {
-        int item = readZigZagLong(stream);
-        const auto &node = schema->as<node::Union>().getChildren()[item];
-        dumpDocument(stream, node, level);
-    } else if (schema->is<node::Custom>()) {
-        for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        }
-        std::cout << schema->getItemName() /* << ":" << schema->getTypeName() << std::endl */ ;
-        dumpDocument(stream, schema->as<node::Custom>().getDefinition(), level);
-    } else if (schema->is<node::Enum>()) {
-        int index = readZigZagLong(stream);
-        const std::string &value = schema->as<node::Enum>()[index];
-        std::cout << /* schema->getItemName() <<*/ ": \"" << value  << '"' << std::endl;
-    } else if (schema->is<node::Array>()) {
-        auto const &node = schema->as<node::Array>().getItemsType();
-
-        std::cout << "[\n";
-        int objectsInBlock = 0;
-        do {
-            objectsInBlock = readZigZagLong(stream);
-            for(int i = 0; i < objectsInBlock; ++i) {
-                dumpDocument(stream, node, level + 1);
-            }
-        } while(objectsInBlock != 0);
-        for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        }
-        std::cout << "]\n";
-    } else if (schema->is<node::Map>()) {
-        auto const &node = schema->as<node::Map>().getItemsType();
-
-        std::cout << "[\n";
-        int objectsInBlock = 0;
-        do {
-            objectsInBlock = readZigZagLong(stream);
-
-            for(int i = 0; i < objectsInBlock; ++i) {
-                for(int k = 0; k < level+1; ++k) {
-                    std::cout << "\t";
-                }
-                std::cout << readString(stream);
-                dumpDocument(stream, node, 1);
-            }
-        } while(objectsInBlock != 0);
-        for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        }
-        std::cout << "]\n";
-    } else {
-        for(int i = 0; i < level; ++i) {
-            std::cout << "\t";
-        }
-        if (schema->is<node::String>()) {
-            const std::string value = stream.getStdString(readZigZagLong(stream));
-            std::cout << schema->getItemName() << ": \"" << value  << '"' << std::endl;
-        } else if (schema->is<node::Int>()) {
-            int value = readZigZagLong(stream);
-            std::cout << schema->getItemName() << ": " << value << std::endl;
-        } else if (schema->is<node::Long>()) {
-            int value = readZigZagLong(stream);
-            std::cout << schema->getItemName() << ": " << value << std::endl;
-        } else if (schema->is<node::Float>()) {
-            // readFloat(stream);
-            std::cout << schema->getItemName() << ": " << readFloat(stream) << std::endl;
-        } else if (schema->is<node::Double>()) {
-            std::cout << schema->getItemName() << ": " << readDouble(stream) << std::endl;
-        } else if (schema->is<node::Boolean>()) {
-            std::cout << schema->getItemName() << ": " << readBoolean(stream) << std::endl;
-        } else if (schema->is<node::Null>()) {
-            std::cout << schema->getItemName() << ": null" << std::endl;
-        } else {
-            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
-            std::cout << "Can't read type: no decoder. Finishing." << std::endl;
-            throw Eof();
-        }
-    }
-}
-
 bool Reader::eof() {
     return d->input->eof();
 }
@@ -717,6 +672,36 @@ std::string Reader::readString(DeflatedBuffer &input) {
     input.read(&result[0], result.size());
 
     return result;
+}
+
+StringBuffer Reader::readStringBuffer(DeflatedBuffer &input) {
+    int64_t len = readZigZagLong(input);
+    return input.getString(len);
+}
+
+
+void Reader::skipString(DeflatedBuffer &input) {
+    int64_t len = readZigZagLong(input);
+    input.skip(len);
+}
+
+void Reader::skipInt(DeflatedBuffer &b) {
+    int shift = 0;
+    uint8_t u;
+    do {
+        if (shift >= 64) {
+            if (b.eof()) {
+                throw Eof();
+            }
+            throw std::runtime_error("Invalid Avro varint");
+        }
+        u = static_cast<uint8_t>(b.getChar());
+        shift += 7;
+
+        // d->read.push_back(u);
+
+
+    } while (u & 0x80);
 }
 
 float Reader::readFloat(DeflatedBuffer &input) {

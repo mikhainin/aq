@@ -30,11 +30,23 @@ public:
         return os;
     }
 
+    inline
+    bool operator == (const std::string &s) const {
+        return std::strncmp(s.data(), c + pointer, std::min<size_t>(s.size(), length - pointer)) == 0;
+    }
+
+    inline
+    bool operator != (const std::string &s) const {
+        return !(*this == s);
+    }
+
+
 private:
     const char *c = nullptr;
     size_t length = 0;
     size_t pointer = 0;
 };
+
 
 inline
 std::ostream& operator<<(std::ostream& os, const StringBuffer& s)

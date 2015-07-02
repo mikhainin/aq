@@ -10,9 +10,9 @@
 #include <boost/spirit/include/phoenix_function.hpp>
 
 #include "detail/ast.hpp"
-
-#include "filter.h"
 #include "compiler.h"
+#include "equality_expression.h"
+#include "filter.h"
 namespace filter {
 
 namespace client
@@ -30,12 +30,12 @@ namespace client
         void operator()(qi::info::nil) const {}
         void operator()(int n) const { std::cout << n; }
         void operator()(const std::string &s) const { std::cout << s; }
-        void operator()(const detail::equality_expression &s) const {
+        void operator()(const equality_expression &s) const {
             std::cout << s.identifier << (s.op == s.EQ ? "==" : "!=");
             this->operator()(s.constant);
         }
 
-        void operator()(const detail::nil &) const { std::cout << "/nil/"; }
+        void operator()(const nil &) const { std::cout << "/nil/"; }
 
         void operator()(detail::expression_ast const& ast) const
         {
@@ -83,10 +83,10 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             constant =
                   int_              [_val = _1 ]
                 | quoted_string     [_val = _1 ]
-                | lit("nil")        [_val = detail::nil()];
+                | lit("nil")        [_val = nil()];
 
             identifier =
-                lexeme[+char_("0-9a-zA-Z.")]
+                lexeme[+char_("0-9a-zA-Z._")]
                 ;
 
 
@@ -116,8 +116,8 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
         qi::rule<Iterator, detail::expression_ast(), ascii::space_type>
         logical_expression, condition, braces_expr;
 
-        qi::rule<Iterator, detail::equality_expression::type(), ascii::space_type> constant;
-        qi::rule<Iterator, detail::equality_expression(), ascii::space_type> equality_expr;
+        qi::rule<Iterator, equality_expression::type(), ascii::space_type> constant;
+        qi::rule<Iterator, equality_expression(), ascii::space_type> equality_expr;
         qi::rule<Iterator, std::string(), ascii::space_type> quoted_string;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
     };
