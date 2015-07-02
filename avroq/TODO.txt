@@ -20,6 +20,7 @@ bug: correctly process unexisted file (without Assertion `fd > 0' failed.)
 configurable [CT]SV separator char
 configurable null value representation in output
 NULL compression codec support
+true/false as optupt values for boolean
 
 Long term TODO
 ==============
