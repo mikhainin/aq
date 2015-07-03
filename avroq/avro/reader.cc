@@ -402,7 +402,7 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
                 try {
                     d->deflate_buffer.startDocument();
                     decodeDocument(d->deflate_buffer, header.schema, filter);
-                    if (d->filter->expressionPassed()) {
+                    if (!d->filter || d->filter->expressionPassed()) {
                         d->deflate_buffer.resetToDocument();
                         if (wd.pos > 0) {
                             auto dumper = TsvDumper(wd);
