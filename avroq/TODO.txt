@@ -16,7 +16,6 @@ print names/values in columns (to be able to copy field names)
 print as json
 sort fields on output
 count matched records
-bug: correctly process unexisted file (without Assertion `fd > 0' failed.)
 configurable [CT]SV separator char
 configurable null value representation in output
 NULL compression codec support

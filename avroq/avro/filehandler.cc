@@ -12,6 +12,10 @@
 
 namespace avro {
 
+FileException::FileException(const std::string &msg) : std::runtime_error(msg) {
+}
+
+
 FileHandle::FileHandle(const std::string &filename) {
 
     struct stat st;
@@ -19,8 +23,10 @@ FileHandle::FileHandle(const std::string &filename) {
     fileLength = st.st_size;
 
     fd = open(filename.c_str(), O_RDONLY);
-    // TODO: check if opened
-    assert(fd > 0);
+
+    if (fd < 0) {
+        throw FileException(std::string("Can't open file '") + filename + "': " + strerror(errno));
+    }
 
 
 }
@@ -44,10 +50,7 @@ std::unique_ptr<StringBuffer> FileHandle::mmapFile() {
         (const char *)mmap(nullptr, len, PROT_READ, MAP_PRIVATE, fd, 0);
 
     if (mmappedFile == MAP_FAILED) {
-        // TODO: handle this case correctyl
-        // close FD, provide useful information how to avoid this error
-        perror(filename.c_str());
-        throw std::runtime_error("Can't mmap file " + filename);
+        throw FileException("Can't mmap file '" + filename + "': " + strerror(errno));
     }
 
     return std::unique_ptr<StringBuffer>(new StringBuffer(mmappedFile, fileLength));
