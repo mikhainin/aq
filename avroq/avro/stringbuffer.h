@@ -33,6 +33,9 @@ public:
 
     inline
     bool operator == (const std::string &s) const {
+        if (s.size() != length - pointer) {
+            return false;
+        }
         return std::strncmp(s.data(), c + pointer, std::min<size_t>(s.size(), length - pointer)) == 0;
     }
 
@@ -40,6 +43,17 @@ public:
     bool operator != (const std::string &s) const {
         return !(*this == s);
     }
+
+    inline
+    bool contains (const std::string &s) const {
+        const char *last = c + length - pointer;
+        auto p = std::search(
+            c + pointer, last,
+            s.data(), s.data() + s.size()
+        );
+        return p != last;
+    }
+
 
 
 private:

@@ -6,6 +6,7 @@
 #include <boost/variant.hpp>
 
 #include "nil.h"
+#include "string_operator.h"
 
 namespace filter {
 
@@ -13,7 +14,8 @@ namespace filter {
     {
         enum OP {
             EQ,
-            NE
+            NE,
+            STRING
         };
         typedef
             boost::variant<
@@ -30,9 +32,13 @@ namespace filter {
 
         equality_expression& operator != (const type &constant);
 
+        equality_expression& operator |= (const string_operator &constant);
+        equality_expression& operator |= (const type &constant);
+
         type constant;
         std::string identifier;
         OP op;
+        string_operator::ops_t strop;
 
 
         /// state

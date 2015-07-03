@@ -4,7 +4,7 @@ threading
 operators <, > for integers
 operators <, > for doubles
 operators <, > for floats
-operators starts_with, ends_with, contains for strings
+operators starts_with, ends_with for strings
 operators == nil, ~= nil
 validate if the field is nullable
 validate if the operation is viable for this field

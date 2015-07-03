@@ -22,6 +22,18 @@ equality_expression& equality_expression::operator != (const type &constant) {
     return *this;
 }
 
+equality_expression& equality_expression::operator |= (const string_operator &strop) {
+    op = STRING;
+    this->strop = strop.op;
+    return *this;
+}
+
+equality_expression& equality_expression::operator |= (const type &constant) {
+    this->constant = constant;
+    return *this;
+}
+
+
 void equality_expression::resetState() {
     state = false;
 }
@@ -29,5 +41,6 @@ void equality_expression::resetState() {
 void equality_expression::setState(bool newState) {
     state = newState;
 }
+
 
 }

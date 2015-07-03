@@ -22,9 +22,16 @@ void Predicate::apply<StringBuffer>(const StringBuffer &sb) {
 
     if (expr->op == filter::equality_expression::EQ) {
         expr->setState(sb == str);
+        // std::cout << "state == " << (sb == str) << std::endl;
     } else if (expr->op == filter::equality_expression::NE) {
         expr->setState(sb != str);
-        // std::cout << "state " << (sb != str) << std::endl;
+        // std::cout << "state != " << (sb != str) << std::endl;
+    } else if (expr->op == filter::equality_expression::STRING) {
+        if (expr->strop == filter::string_operator::CONTAINS) {
+            expr->setState(sb.contains(str));
+        } else {
+            assert(false && "expr->string_operator contains unknown operator");
+        }
     } else {
         assert(false && "expr->op contains unknown operator");
     }
