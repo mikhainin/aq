@@ -3,6 +3,7 @@
 #define __avroq__stringbuffer__
 
 #include <cstddef>
+#include <cstring>
 #include <ostream>
 #include <string>
 
