@@ -91,7 +91,7 @@ int main(int argc, const char * argv[]) {
         } catch (const avro::Finished &e) {
             ;
         } catch (const avro::Reader::PathNotFound &e) {
-        	std::cerr << "can't locate path" << e.getPath() << std::endl;
+        	std::cerr << "can't locate path '" << e.getPath() << "'" << std::endl;
         }
 
     } else {
