@@ -140,10 +140,10 @@ std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
 
     if (r && iter == end)
     {
-        std::cout << "-------------------------\n";
-        std::cout << "Parsing succeeded\n";
+        // std::cout << "-------------------------\n";
+        // std::cout << "Parsing succeeded\n";
         // printer(ast);
-        std::cout << "\n-------------------------\n";
+        // std::cout << "\n-------------------------\n";
     }
     else
     {

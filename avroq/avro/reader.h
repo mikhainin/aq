@@ -88,6 +88,12 @@ private:
     class Private;
     Private *d = nullptr;
 
+    template <typename T>
+    T read(DeflatedBuffer &input);
+
+    template <typename T>
+    void skip(DeflatedBuffer &input);
+
     // int64_t readLong(std::istream &input);
     std::string readString(DeflatedBuffer &input);
     StringBuffer readStringBuffer(DeflatedBuffer &input);
@@ -106,6 +112,9 @@ private:
     void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper);
 
     const Node* schemaNodeByPath(const std::string &path, const header &header);
+
+    template <class T>
+    void skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema);
 };
 
 }

@@ -15,7 +15,8 @@ Predicate::Predicate(filter::equality_expression *expr) : expr(expr) {
 Predicate::~Predicate() {
 }
 
-void Predicate::applyString(const StringBuffer &sb) {
+template<>
+void Predicate::apply<StringBuffer>(const StringBuffer &sb) {
 
     const std::string & str = boost::get<std::string>(expr->constant);
 
@@ -29,7 +30,8 @@ void Predicate::applyString(const StringBuffer &sb) {
     }
 }
 
-void Predicate::applyInt(int i) {
+template<>
+void Predicate::apply<int>(const int &i) {
     // TODO: use pattern "strategy" here
     if (expr->op == filter::equality_expression::EQ) {
         expr->setState(boost::get<int>(expr->constant) == i);
@@ -39,6 +41,19 @@ void Predicate::applyInt(int i) {
         assert(false && "expr->op contains unknown operator");
     }
 }
+
+template<>
+void Predicate::apply<long>(const long &i) {
+    // TODO: use pattern "strategy" here
+    if (expr->op == filter::equality_expression::EQ) {
+        expr->setState(boost::get<int>(expr->constant) == i);
+    } else if (expr->op == filter::equality_expression::NE) {
+        expr->setState(boost::get<int>(expr->constant) != i);
+    } else {
+        assert(false && "expr->op contains unknown operator");
+    }
+}
+
 
 }
 }

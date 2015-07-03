@@ -16,8 +16,10 @@ public:
     Predicate(filter::equality_expression *expr);
     virtual ~Predicate();
 
-    virtual void applyString(const StringBuffer &sb);
-    virtual void applyInt(int i);
+    template <typename T>
+    void apply(const T &sb);
+    
+    // void applyInt(int i);
 
 private:
     filter::equality_expression *expr;

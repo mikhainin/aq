@@ -62,7 +62,7 @@ public:
 
     FileHandle file;
     std::shared_ptr<filter::Filter> filter;
-    std::unordered_map<const Node *, std::shared_ptr<predicate::Predicate>> filterItems;
+    std::unordered_multimap<const Node *, std::shared_ptr<predicate::Predicate>> filterItems;
 
     Private(const std::string& filename, Limiter &limit) : filename(filename), limit(limit), file(filename) {
     }
@@ -379,7 +379,12 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
                 }
             }
         }
-        d->filterItems[filterNode] = std::make_shared<predicate::Predicate>(filterPredicate);
+        d->filterItems.insert(
+                std::make_pair(
+                    filterNode,
+                    std::make_shared<predicate::Predicate>(filterPredicate)
+                )
+            );
     }
 }
 
@@ -395,11 +400,12 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
         for(int i = 0; i < objectCountInBlock; ++i) {
             // TODO: rewrite it using hierarcy of filters/decoders.
             // TODO: implement counter as a filter  
-            if (!filter && false) {
-                // dumpDocument(d->deflate_buffer, header.schema, 0);
+            d->deflate_buffer.startDocument();
+            decodeDocument(d->deflate_buffer, header.schema, filter);
+            if (!d->filter || d->filter->expressionPassed()) {
+                d->deflate_buffer.resetToDocument();
                 if (wd.pos > 0) {
                     auto dumper = TsvDumper(wd);
-                    // std::cout << "readBlock " << wd.what.size() << std::endl;
                     dumpDocument(d->deflate_buffer, header.schema, dumper);
                     dumper.EndDocument();
                 } else {
@@ -408,36 +414,6 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
                     dumper.EndDocument();
                 }
                 d->limit.documentFinished();
-            } else {
-                try {
-                    d->deflate_buffer.startDocument();
-                    decodeDocument(d->deflate_buffer, header.schema, filter);
-                    if (!d->filter || d->filter->expressionPassed()) {
-                        d->deflate_buffer.resetToDocument();
-                        if (wd.pos > 0) {
-                            auto dumper = TsvDumper(wd);
-                            dumpDocument(d->deflate_buffer, header.schema, dumper);
-                            dumper.EndDocument();
-                        } else {
-                            auto dumper = DocumentDumper();
-                            dumpDocument(d->deflate_buffer, header.schema, dumper);
-                            dumper.EndDocument();
-                        }
-                        d->limit.documentFinished();
-                    }
-                } catch (const DumpObject &e) {
-                    d->deflate_buffer.resetToDocument();
-                    if (wd.pos > 0) {
-                        auto dumper = TsvDumper(wd);
-                        dumpDocument(d->deflate_buffer, header.schema, dumper);
-                        dumper.EndDocument();
-                    } else {
-                        auto dumper = DocumentDumper();
-                        dumpDocument(d->deflate_buffer, header.schema, dumper);
-                        dumper.EndDocument();
-                    }
-                    d->limit.documentFinished();
-                }
             }
         }
 
@@ -493,32 +469,11 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
         } while(objectsInBlock != 0);
     } else {
         if (schema->is<node::String>()) {
-            if (d->filter && d->filterItems.find( schema.get() ) !=  d->filterItems.end()) {
-                const auto &value = readStringBuffer(stream);
-                auto filterItem = d->filterItems.find(schema.get());
-
-                filterItem->second->applyString(value);
-            } else {
-                skipString(stream);
-            }
+            skipOrApplyFilter<StringBuffer>(stream, schema);
         } else if (schema->is<node::Int>()) {
-            if (d->filter && d->filterItems.find( schema.get() ) !=  d->filterItems.end()) {
-                const auto &value = readZigZagLong(stream);
-                auto filterItem = d->filterItems.find(schema.get());
-
-                filterItem->second->applyInt(value);
-            } else {
-                skipInt(stream);
-            }
+            skipOrApplyFilter<int>(stream, schema);
         } else if (schema->is<node::Long>()) {
-            if (d->filter && d->filterItems.find( schema.get() ) !=  d->filterItems.end()) {
-                const auto &value = readZigZagLong(stream);
-                auto filterItem = d->filterItems.find(schema.get());
-
-                filterItem->second->applyInt(value);
-            } else {
-                skipInt(stream);
-            }
+            skipOrApplyFilter<long>(stream, schema);
         } else if (schema->is<node::Float>()) {
             readFloat(stream);
         } else if (schema->is<node::Double>()) {
@@ -629,6 +584,62 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
             throw Eof();
         }
     }
+}
+
+template <typename T>
+void Reader::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema) {
+    if (d->filter) {
+        auto range = d->filterItems.equal_range(schema.get());
+        if (range.first != range.second) {
+            const auto &value = read<T>(stream);
+            for_each (
+                range.first,
+                range.second,
+                [&value](const auto& filterItem){
+                    filterItem.second->template apply<T>(value);
+                }
+            );
+        } else {
+            skip<T>(stream);
+        }
+    } else {
+        skip<T>(stream);
+    }
+}
+
+template <>
+StringBuffer Reader::read(DeflatedBuffer &input) {
+    int64_t len = readZigZagLong(input);
+    return input.getString(len);
+}
+
+template <>
+void Reader::skip<StringBuffer>(DeflatedBuffer &input) {
+    int64_t len = readZigZagLong(input);
+    input.skip(len);
+}
+
+
+template <>
+long Reader::read(DeflatedBuffer &input) {
+    return readZigZagLong(input);
+}
+
+template <>
+void Reader::skip<long>(DeflatedBuffer &input) {
+    skipInt(input);
+}
+
+
+
+template <>
+int Reader::read(DeflatedBuffer &input) {
+    return readZigZagLong(input);
+}
+
+template <>
+void Reader::skip<int>(DeflatedBuffer &input) {
+    skipInt(input);
 }
 
 bool Reader::eof() {
