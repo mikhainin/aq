@@ -33,19 +33,6 @@ struct header {
     char sync[16] = {0}; // TODO sync length to a constant
 };
 
-struct FilterExpression {
-    std::string what;
-    const Node *shemaItem;
-    union {
-        long i;
-        // std::string s;
-        float f;
-        double d;
-        bool b;
-    } value;
-    std::string strValue;
-};
-
 
 struct TsvExpression {
 	std::map<int, int> what;
@@ -75,9 +62,8 @@ public:
 
     header readHeader();
 
-    void readBlock(const header &header, const FilterExpression *filter, const TsvExpression &wd);
+    void readBlock(const header &header, const TsvExpression &wd);
 
-    FilterExpression compileCondition(const std::string &what, const std::string &condition, const header &header);
     TsvExpression compileFieldsList(const std::string &filedList, const header &header);
 
     void setFilter(std::shared_ptr<filter::Filter> filter, const header &header);
@@ -104,7 +90,7 @@ private:
     bool readBoolean(DeflatedBuffer &input);
 
     void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
-    void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter);
+    void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema);
 
     //void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
 

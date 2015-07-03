@@ -74,7 +74,7 @@ int main(int argc, const char * argv[]) {
 
                 try {
                     while (not reader.eof()) {
-                        reader.readBlock(header, nullptr, wd);
+                        reader.readBlock(header, wd);
                     }
                 } catch (const avro::Eof &e) {
                     ; // reading done

@@ -18,8 +18,6 @@ public:
 
     template <typename T>
     void apply(const T &sb);
-    
-    // void applyInt(int i);
 
 private:
     filter::equality_expression *expr;

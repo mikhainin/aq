@@ -388,7 +388,7 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
     }
 }
 
-void Reader::readBlock(const header &header, const FilterExpression *filter, const TsvExpression &wd) {
+void Reader::readBlock(const header &header, const TsvExpression &wd) {
 
     int64_t objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
@@ -401,7 +401,7 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
             // TODO: rewrite it using hierarcy of filters/decoders.
             // TODO: implement counter as a filter  
             d->deflate_buffer.startDocument();
-            decodeDocument(d->deflate_buffer, header.schema, filter);
+            decodeDocument(d->deflate_buffer, header.schema);
             if (!d->filter || d->filter->expressionPassed()) {
                 d->deflate_buffer.resetToDocument();
                 if (wd.pos > 0) {
@@ -430,17 +430,17 @@ void Reader::readBlock(const header &header, const FilterExpression *filter, con
 
 }
 
-void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter) {
+void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema) {
     if (schema->is<node::Record>()) {
         for(auto &p : schema->as<node::Record>().getChildren()) {
-            decodeDocument(stream, p, filter);
+            decodeDocument(stream, p);
         }
     } else if (schema->is<node::Union>()) {
         int item = readZigZagLong(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
-        decodeDocument(stream, node, filter);
+        decodeDocument(stream, node);
     } else if (schema->is<node::Custom>()) {
-        decodeDocument(stream, schema->as<node::Custom>().getDefinition(), filter);
+        decodeDocument(stream, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Enum>()) {
         int index = readZigZagLong(stream);
         (void)index;
@@ -451,7 +451,7 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
         do {
             objectsInBlock = readZigZagLong(stream);
             for(int i = 0; i < objectsInBlock; ++i) {
-                decodeDocument(stream, node, filter);
+                decodeDocument(stream, node);
             }
         } while(objectsInBlock != 0);
 
@@ -464,7 +464,7 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
 
             for(int i = 0; i < objectsInBlock; ++i) {
                 readString(stream);
-                decodeDocument(stream, node, filter);
+                decodeDocument(stream, node);
             }
         } while(objectsInBlock != 0);
     } else {
@@ -785,43 +785,6 @@ TsvExpression Reader::compileFieldsList(const std::string &filedList, const head
     // std::cout << "compile " << result.what.size() << std::endl;
     return result;
 
-}
-
-FilterExpression Reader::compileCondition(const std::string &what, const std::string &condition, const header &header) {
-
-    FilterExpression result;
-
-    auto currentNode = schemaNodeByPath(what, header);
-
-    if (currentNode->is<node::String>()) {
-        result.strValue = condition;
-    } else if (currentNode->is<node::Int>()) {
-        result.value.i = boost::lexical_cast<int>(condition);
-    } else if (currentNode->is<node::Long>()) {
-        result.value.i = boost::lexical_cast<int>(condition);
-    } else if (currentNode->is<node::Union>()) {
-        for( auto &p : currentNode->as<node::Union>().getChildren()) {
-            if (p->is<node::String>()) {
-                result.strValue = condition;
-                currentNode = p.get();
-                break;
-            } else if (p->is<node::Int>()) {
-                result.value.i = boost::lexical_cast<int>(condition);
-                currentNode = p.get();
-                break;
-            }
-        }
-    } else {
-        std::cout << "Unsupported type: " << currentNode->getTypeName() << " name=" <<currentNode->getItemName() << std::endl;
-
-        throw PathNotFound(what);
-    }
-
-    result.shemaItem = currentNode;
-    result.what = what;
-
-
-    return result;
 }
 
 const Node *Reader::schemaNodeByPath(const std::string &path, const header &header) {
