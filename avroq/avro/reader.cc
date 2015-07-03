@@ -163,7 +163,7 @@ public:
     }
 
     void Boolean(bool b, const node::Boolean &n) {
-        std::cout << indents[level] << n.getItemName() << ':' << ' ' << b << std::endl;
+        std::cout << indents[level] << n.getItemName() << ':' << ' ' << (b ? "true" : "false") << std::endl;
     }
 
     void Null(const node::Null &n) {
@@ -237,6 +237,19 @@ private:
     T t;
 };
 
+template<>
+class TDumper<bool> : public Dumper {
+public:
+
+    TDumper(const bool &t) : Dumper(), t(t) {
+    }   
+    void dump(std::ostream &os) {
+        os << (t ? "true" : "false");
+    }   
+private:
+    bool t;
+};
+
 class TsvDumper {
 public:
     TsvDumper(const TsvExpression &wd) : whatDump(wd) {
@@ -246,12 +259,9 @@ public:
 
     template<typename T, typename NodeType>
     void addIfNecessary(const T &t, const NodeType &n) {
-        // std::cout << "sz " << whatDump.what.size() << std::endl;
     	auto p = whatDump.what.find(n.getNumber());
     	if (p != whatDump.what.end()) {
-            // std::cout << "adding " << n.getItemName() << " num=" << n.getNumber() << " pos = " << p->second << std::endl;
-
-    		toDump[p->second].reset(new TDumper<T>(t));
+            toDump[p->second].reset(new TDumper<T>(t));
     	} else {
             // std::cout << "NOT adding " << n.getItemName() << " num=" << n.getNumber() << " pos = " << p->second << " addIfNecessary() " << whatDump.what.size() << std::endl;
     	}
