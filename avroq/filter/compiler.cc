@@ -132,7 +132,6 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
 
         qi::rule<Iterator, equality_expression::type(), ascii::space_type> constant;
         qi::rule<Iterator, equality_expression(), ascii::space_type> equality_expr;
-        // qi::rule<Iterator, equality_expression(), ascii::space_type> string_operator;
         qi::rule<Iterator, std::string(), ascii::space_type> quoted_string;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
     };

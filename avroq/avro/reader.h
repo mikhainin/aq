@@ -16,6 +16,8 @@
 #include <boost/iostreams/filtering_stream.hpp>
 
 #include "stringbuffer.h"
+#include "dumper/tsvexpression.h"
+
 namespace filter {
     class Filter;
 }
@@ -33,11 +35,6 @@ struct header {
     char sync[16] = {0}; // TODO sync length to a constant
 };
 
-
-struct TsvExpression {
-	std::map<int, int> what;
-	int pos = 0;
-};
 
 class Reader {
 public:
@@ -62,9 +59,9 @@ public:
 
     header readHeader();
 
-    void readBlock(const header &header, const TsvExpression &wd);
+    void readBlock(const header &header, const dumper::TsvExpression &wd);
 
-    TsvExpression compileFieldsList(const std::string &filedList, const header &header);
+    dumper::TsvExpression compileFieldsList(const std::string &filedList, const header &header);
 
     void setFilter(std::shared_ptr<filter::Filter> filter, const header &header);
 

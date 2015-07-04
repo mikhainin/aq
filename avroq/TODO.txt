@@ -9,6 +9,7 @@ validate if the field is nullable
 validate if the operation is viable for this field
 operator ==, ~= for enums
 operator ==, ~= for bools
+throw error when unable to compile condition
 
 TODO
 print names/values in columns (to be able to copy field names)
@@ -18,6 +19,7 @@ count matched records
 configurable [CT]SV separator char
 configurable null value representation in output
 NULL compression codec support
+check condition after last used schema node
 
 Long term TODO
 ==============
