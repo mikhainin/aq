@@ -73,6 +73,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             using qi::_1;
             using qi::int_;
             using qi::bool_;
+            using qi::double_;
             using qi::string;
             using qi::lexeme;
             using qi::lit;
@@ -85,8 +86,9 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                 ;
 
             constant =
-                  int_              [_val = _1 ]
+                  double_           [_val = _1 ]
                 | bool_             [_val = _1 ]
+                | int_              [_val = _1 ]
                 | quoted_string     [_val = _1 ]
                 | lit("nil")        [_val = nil()];
 

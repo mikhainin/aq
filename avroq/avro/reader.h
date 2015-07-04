@@ -77,13 +77,10 @@ private:
     template <typename T>
     void skip(DeflatedBuffer &input);
 
-    // int64_t readLong(std::istream &input);
     std::string readString(DeflatedBuffer &input);
     StringBuffer readStringBuffer(DeflatedBuffer &input);
     void skipString(DeflatedBuffer &input);
     void skipInt(DeflatedBuffer &input);
-    float readFloat(DeflatedBuffer &input);
-    double readDouble(DeflatedBuffer &input);
 
     void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema);

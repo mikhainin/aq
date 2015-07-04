@@ -79,5 +79,31 @@ void Predicate::apply<bool>(const bool &b) {
 }
 
 
+template<>
+void Predicate::apply<float>(const float &b) {
+    // TODO: use pattern "strategy" here
+    if (expr->op == filter::equality_expression::EQ) {
+        expr->setState(boost::get<float>(expr->constant) == b);
+    } else if (expr->op == filter::equality_expression::NE) {
+        expr->setState(boost::get<float>(expr->constant) != b);
+    } else {
+        assert(false && "expr->op contains unknown operator");
+    }
+}
+
+
+template<>
+void Predicate::apply<double>(const double &b) {
+    // TODO: use pattern "strategy" here
+    if (expr->op == filter::equality_expression::EQ) {
+        expr->setState(boost::get<double>(expr->constant) == b);
+    } else if (expr->op == filter::equality_expression::NE) {
+        expr->setState(boost::get<double>(expr->constant) != b);
+    } else {
+        assert(false && "expr->op contains unknown operator");
+    }
+}
+
+
 }
 }

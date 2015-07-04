@@ -111,6 +111,43 @@ header Reader::readHeader() {
 }
 
 
+struct ToDouble {
+    using result_type = double;
+    double operator() (double d) const {
+        return d;
+    }
+    double operator() (float f) const {
+        return f;
+    }
+    double operator() (int i) const {
+        return i;
+    }
+
+    template <typename T>
+    double operator() (const T&) const {
+        throw std::runtime_error("wrong type");
+    }
+};
+
+
+struct ToFloat {
+    using result_type = float;
+    float operator() (double d) const {
+        return d;
+    }
+    float operator() (float f) const {
+        return f;
+    }
+    float operator() (int i) const {
+        return i;
+    }
+
+    template <typename T>
+    float operator() (const T&) const {
+        throw std::runtime_error("wrong type");
+    }
+};
+
 void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &header) {
     d->filter = filter;
 
@@ -123,7 +160,14 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
                 if (filterNode->is<node::Custom>()) {
                     filterNode = filterNode->as<node::Custom>().getDefinition().get();
                 }
-                if (filterNode->isOneOf<node::String, node::Int, node::Long, node::Boolean, node::Enum>()) {
+                if (filterNode->isOneOf<
+                            node::Boolean,
+                            node::Double,
+                            node::Enum,
+                            node::Float,
+                            node::Int,
+                            node::Long,
+                            node::String>()) {
                     break;
                 }
             }
@@ -138,6 +182,10 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
                 throw std::runtime_error("Invalid value for enum field '" + filterPredicate->identifier + "'");
             }
             filterPredicate->constant = i;
+        } else if (filterNode->is<node::Double>()) {
+            filterPredicate->constant = boost::apply_visitor(ToDouble(), filterPredicate->constant);
+        } else if (filterNode->is<node::Float>()) {
+            filterPredicate->constant = boost::apply_visitor(ToFloat(), filterPredicate->constant);
         } else {
             throw std::runtime_error(
                 "Sorry, but type '" + filterNode->getTypeName() +
@@ -239,9 +287,9 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
         } else if (schema->is<node::Long>()) {
             skipOrApplyFilter<long>(stream, schema);
         } else if (schema->is<node::Float>()) {
-            readFloat(stream);
+            skipOrApplyFilter<float>(stream, schema);
         } else if (schema->is<node::Double>()) {
-            readDouble(stream);
+            skipOrApplyFilter<double>(stream, schema);
         } else if (schema->is<node::Boolean>()) {
             skipOrApplyFilter<bool>(stream, schema);
         } else if (schema->is<node::Null>()) {
@@ -329,11 +377,11 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
         } else if (schema->is<node::Float>()) {
             // readFloat(stream);
             // std::cout << schema->getItemName() << ": " << readFloat(stream) << std::endl;
-            float value = readFloat(stream);
+            float value = read<float>(stream);
             dumper.Float(value, schema->as<node::Float>());
         } else if (schema->is<node::Double>()) {
             // std::cout << schema->getItemName() << ": " << readDouble(stream) << std::endl;
-            double value = readDouble(stream);
+            double value = read<double>(stream);
             dumper.Double(value, schema->as<node::Double>());
         } else if (schema->is<node::Boolean>()) {
             // std::cout << schema->getItemName() << ": " << readBoolean(stream) << std::endl;
@@ -418,6 +466,51 @@ void Reader::skip<bool>(DeflatedBuffer &input) {
     input.skip(1);
 }
 
+
+
+template <>
+float Reader::read(DeflatedBuffer &input) {
+    static_assert(sizeof(float) == 4, "sizeof(float) should be == 4");
+
+    union {
+        uint8_t bytes[4];
+        float result;
+    } buffer;
+
+    input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
+
+    return buffer.result;
+}
+
+template <>
+void Reader::skip<float>(DeflatedBuffer &input) {
+    static_assert(sizeof(float) == 4, "sizeof(float) should be == 4");
+    input.skip(4);
+}
+
+
+template <>
+double Reader::read(DeflatedBuffer &input) {
+    static_assert(sizeof(double) == 8, "sizeof(double) should be == 8");
+
+    union {
+        uint8_t bytes[8];
+        double result;
+    } buffer;
+
+    input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
+
+    return buffer.result;
+}
+
+template <>
+void Reader::skip<double>(DeflatedBuffer &input) {
+    static_assert(sizeof(double) == 8, "sizeof(double) should be == 8");
+    input.skip(8);
+}
+
+
+
 bool Reader::eof() {
     return d->input->eof();
 }
@@ -499,32 +592,6 @@ void Reader::skipInt(DeflatedBuffer &b) {
 
 
     } while (u & 0x80);
-}
-
-float Reader::readFloat(DeflatedBuffer &input) {
-    static_assert(sizeof(float) == 4, "sizeof(float) should be == 4");
-
-    union {
-        uint8_t bytes[4];
-        float result;
-    } buffer;
-
-    input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
-
-    return buffer.result;
-}
-
-double Reader::readDouble(DeflatedBuffer &input) {
-    static_assert(sizeof(double) == 8, "sizeof(double) should be == 8");
-
-    union {
-        uint8_t bytes[8];
-        double result;
-    } buffer;
-
-    input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
-
-    return buffer.result;
 }
 
 dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, const header &header) {

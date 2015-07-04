@@ -22,6 +22,8 @@ namespace filter {
                 nil
               , int
               , bool
+              , double
+              , float
               , std::string
             > type;
 
