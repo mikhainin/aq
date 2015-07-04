@@ -3,7 +3,9 @@ namespace filter {
 
 struct string_operator {
     enum ops_t {
-        CONTAINS
+        CONTAINS,
+        STARTS_WITH,
+        ENDS_WITH
     };
     
     string_operator(ops_t op) : op(op) {

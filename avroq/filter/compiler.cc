@@ -100,7 +100,12 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                     |
 
                 identifier                       [_val = _1]
-                    >> (lit(":contains(")        [_val |= string_operator(string_operator::CONTAINS)]
+                    >> (
+                            (
+                                lit(":contains(")      [_val |= string_operator(string_operator::CONTAINS)]
+                                | lit(":starts_with(") [_val |= string_operator(string_operator::STARTS_WITH)]
+                                | lit(":ends_with(")   [_val |= string_operator(string_operator::ENDS_WITH)]
+                            )
                          >> quoted_string        [_val |= _1]
                          >> ')'
                        )

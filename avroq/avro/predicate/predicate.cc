@@ -29,6 +29,10 @@ void Predicate::apply<StringBuffer>(const StringBuffer &sb) {
     } else if (expr->op == filter::equality_expression::STRING) {
         if (expr->strop == filter::string_operator::CONTAINS) {
             expr->setState(sb.contains(str));
+        } else if (expr->strop == filter::string_operator::STARTS_WITH) {
+            expr->setState(sb.starts_with(str));
+        } else if (expr->strop == filter::string_operator::ENDS_WITH) {
+            expr->setState(sb.ends_with(str));
         } else {
             assert(false && "expr->string_operator contains unknown operator");
         }
