@@ -22,6 +22,33 @@ equality_expression& equality_expression::operator != (const type &constant) {
     return *this;
 }
 
+equality_expression& equality_expression::operator < (const type &constant) {
+    this->constant = constant;
+    op = LT;
+    return *this;
+}
+
+equality_expression& equality_expression::operator > (const type &constant) {
+    this->constant = constant;
+    op = GT;
+    return *this;
+}
+
+equality_expression& equality_expression::operator <= (const type &constant) {
+    this->constant = constant;
+    op = LE;
+    return *this;
+}
+
+
+equality_expression& equality_expression::operator >= (const type &constant) {
+    this->constant = constant;
+    op = GE;
+    return *this;
+}
+
+
+
 equality_expression& equality_expression::operator |= (const string_operator &strop) {
     op = STRING;
     this->strop = strop.op;

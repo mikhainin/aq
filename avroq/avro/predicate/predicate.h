@@ -21,6 +21,9 @@ public:
 
 private:
     filter::equality_expression *expr;
+
+    template <typename T>
+    void applyNumeric(const T &sb);
 };
 
 }

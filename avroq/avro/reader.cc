@@ -148,6 +148,24 @@ struct ToFloat {
     }
 };
 
+struct ToInt {
+    using result_type = int;
+    int operator() (double d) const {
+        return d;
+    }
+    int operator() (float f) const {
+        return f;
+    }
+    int operator() (int i) const {
+        return i;
+    }
+
+    template <typename T>
+    float operator() (const T&) const {
+        throw std::runtime_error("wrong type");
+    }
+};
+
 void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &header) {
     d->filter = filter;
 
@@ -172,7 +190,7 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
                 }
             }
         }
-        if (filterNode->isOneOf<node::String, node::Int, node::Long, node::Boolean>()) {
+        if (filterNode->isOneOf<node::String, node::Boolean>()) {
             ; // ok
         } else if (filterNode->is<node::Enum>()) {
             auto const &e = filterNode->as<node::Enum>();
@@ -186,6 +204,8 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
             filterPredicate->constant = boost::apply_visitor(ToDouble(), filterPredicate->constant);
         } else if (filterNode->is<node::Float>()) {
             filterPredicate->constant = boost::apply_visitor(ToFloat(), filterPredicate->constant);
+        } else if (filterNode->isOneOf<node::Int, node::Long>()) {
+            filterPredicate->constant = boost::apply_visitor(ToInt(), filterPredicate->constant);
         } else {
             throw std::runtime_error(
                 "Sorry, but type '" + filterNode->getTypeName() +

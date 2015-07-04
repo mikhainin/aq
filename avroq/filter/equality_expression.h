@@ -15,6 +15,10 @@ namespace filter {
         enum OP {
             EQ,
             NE,
+            LT,
+            GT,
+            LE,
+            GE,
             STRING
         };
         typedef
@@ -37,6 +41,11 @@ namespace filter {
 
         equality_expression& operator |= (const string_operator &constant);
         equality_expression& operator |= (const type &constant);
+
+        equality_expression& operator < (const type &constant);
+        equality_expression& operator > (const type &constant);
+        equality_expression& operator >= (const type &constant);
+        equality_expression& operator <= (const type &constant);
 
         type constant;
         std::string identifier;

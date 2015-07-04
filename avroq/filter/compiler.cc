@@ -98,9 +98,13 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
 
 
             equality_expr =
-                identifier                  [_val = _1]
+                identifier                  [_val =  _1]
                     >>  ( ("==" >> constant [_val == _1])
                         | ("~=" >> constant [_val != _1])
+                        | ("<"  >> constant [_val <  _1])
+                        | (">"  >> constant [_val >  _1])
+                        | ("<=" >> constant [_val <= _1])
+                        | ("=>" >> constant [_val >= _1])
                         )
                     |
 

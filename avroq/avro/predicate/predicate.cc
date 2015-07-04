@@ -43,26 +43,12 @@ void Predicate::apply<StringBuffer>(const StringBuffer &sb) {
 
 template<>
 void Predicate::apply<int>(const int &i) {
-    // TODO: use pattern "strategy" here
-    if (expr->op == filter::equality_expression::EQ) {
-        expr->setState(boost::get<int>(expr->constant) == i);
-    } else if (expr->op == filter::equality_expression::NE) {
-        expr->setState(boost::get<int>(expr->constant) != i);
-    } else {
-        assert(false && "expr->op contains unknown operator");
-    }
+    applyNumeric<int>(i);
 }
 
 template<>
 void Predicate::apply<long>(const long &i) {
-    // TODO: use pattern "strategy" here
-    if (expr->op == filter::equality_expression::EQ) {
-        expr->setState(boost::get<int>(expr->constant) == i);
-    } else if (expr->op == filter::equality_expression::NE) {
-        expr->setState(boost::get<int>(expr->constant) != i);
-    } else {
-        assert(false && "expr->op contains unknown operator");
-    }
+    applyNumeric<int>(i);
 }
 
 
@@ -80,28 +66,37 @@ void Predicate::apply<bool>(const bool &b) {
 
 
 template<>
-void Predicate::apply<float>(const float &b) {
-    // TODO: use pattern "strategy" here
-    if (expr->op == filter::equality_expression::EQ) {
-        expr->setState(boost::get<float>(expr->constant) == b);
-    } else if (expr->op == filter::equality_expression::NE) {
-        expr->setState(boost::get<float>(expr->constant) != b);
-    } else {
-        assert(false && "expr->op contains unknown operator");
-    }
+void Predicate::apply<float>(const float &f) {
+    applyNumeric<float>(f);
 }
 
 
 template<>
-void Predicate::apply<double>(const double &b) {
+void Predicate::apply<double>(const double &d) {
+    applyNumeric<double>(d);
+}
+
+template <typename T>
+void Predicate::applyNumeric(const T &i) {
     // TODO: use pattern "strategy" here
+    auto const value = boost::get<T>(expr->constant);
+    
     if (expr->op == filter::equality_expression::EQ) {
-        expr->setState(boost::get<double>(expr->constant) == b);
+        expr->setState(value == i);
     } else if (expr->op == filter::equality_expression::NE) {
-        expr->setState(boost::get<double>(expr->constant) != b);
+        expr->setState(value != i);
+    } else if (expr->op == filter::equality_expression::LT) {
+        expr->setState(i < value);
+    } else if (expr->op == filter::equality_expression::GT) {
+        expr->setState(i > value);
+    } else if (expr->op == filter::equality_expression::LE) {
+        expr->setState(i <= value);
+    } else if (expr->op == filter::equality_expression::GE) {
+        expr->setState(i >= value);
     } else {
         assert(false && "expr->op contains unknown operator");
     }
+
 }
 
 
