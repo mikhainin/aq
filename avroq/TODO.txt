@@ -15,7 +15,6 @@ configurable [CT]SV separator char
 configurable null value representation in output
 NULL compression codec support
 check condition after last used schema node
-bug: reset filter after document
 
 Long term TODO
 ==============

@@ -247,6 +247,9 @@ void Reader::readBlock(const header &header, const dumper::TsvExpression &wd) {
                     dumper.EndDocument();
                 }
                 d->limit.documentFinished();
+                if(d->filter) {
+                    d->filter->resetState();
+                }
             }
         }
 

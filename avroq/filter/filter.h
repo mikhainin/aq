@@ -19,7 +19,8 @@ public:
     void addExpression(equality_expression &expr);
     std::vector<std::string> getUsedPaths() const;
     const std::vector<equality_expression*> &getPredicates();
-    bool expressionPassed();
+    bool expressionPassed() const;
+    void resetState();
 private:
     std::shared_ptr<detail::expression_ast> ast;
     std::vector<equality_expression*> predicateList;

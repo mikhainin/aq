@@ -25,7 +25,7 @@ struct ExpressionExtractor
         filter.addExpression(s);
     }
 
-    void operator()(const nil &) const { std::cout << "/nil/"; }
+    void operator()(const nil &) const {  }
 
     void operator()(detail::expression_ast& ast) const
     {
@@ -76,14 +76,40 @@ struct AstRunner
 
 };
 
+struct ExpressionResetter
+{
 
+    typedef void result_type;
+
+    ExpressionResetter() {
+    }
+
+    void operator()(qi::info::nil) const {}
+    void operator()(int ) const { }
+    void operator()(const std::string &) const {  }
+    void operator()(equality_expression &s) const {
+        s.resetState();
+    }
+
+    void operator()(const nil &) const {  }
+
+    void operator()(detail::expression_ast& ast) const
+    {
+        boost::apply_visitor(*this, ast.expr);
+    }
+    void operator()(detail::binary_op& expr) const
+    {
+        boost::apply_visitor(*this, expr.left.expr);
+        boost::apply_visitor(*this, expr.right.expr);
+    }
+};
 
 Filter::Filter(std::shared_ptr<detail::expression_ast> ast) : ast(ast) {
     ExpressionExtractor extractor(*this);
     extractor(*ast);
 }
 
-bool Filter::expressionPassed() {
+bool Filter::expressionPassed() const {
     AstRunner runner;
     return runner(*ast);
 }
@@ -104,6 +130,11 @@ std::vector<std::string> Filter::getUsedPaths() const {
 
 const std::vector<equality_expression*> &Filter::getPredicates() {
     return predicateList;
+}
+
+void Filter::resetState() {
+    ExpressionResetter reset;
+    reset(*ast);
 }
 
 }
