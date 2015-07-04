@@ -119,13 +119,13 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
 
         if (filterNode->is<node::Union>()) {
             for( auto &p : filterNode->as<node::Union>().getChildren()) {
-                if (p->is<node::String>()) {
+                if (p->isOneOf<node::String, node::Int, node::Long, node::Boolean>()) {
                     filterNode = p.get();
                     break;
-                } else if (p->is<node::Int>() || p->is<node::Long>()) {
+                }/* else if (p->is<node::Int>() || p->is<node::Long>()) {
                     filterNode = p.get();
                     break;
-                }
+                }*/
             }
         }
         d->filterItems.insert(
@@ -228,7 +228,7 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
         } else if (schema->is<node::Double>()) {
             readDouble(stream);
         } else if (schema->is<node::Boolean>()) {
-            readBoolean(stream);
+            skipOrApplyFilter<bool>(stream, schema);
         } else if (schema->is<node::Null>()) {
             ; // empty value: no way to process
         } else {
@@ -322,7 +322,7 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
             dumper.Double(value, schema->as<node::Double>());
         } else if (schema->is<node::Boolean>()) {
             // std::cout << schema->getItemName() << ": " << readBoolean(stream) << std::endl;
-            bool value = readBoolean(stream);
+            bool value = read<bool>(stream);
             dumper.Boolean(value, schema->as<node::Boolean>());
         } else if (schema->is<node::Null>()) {
             // std::cout << schema->getItemName() << ": null" << std::endl;
@@ -389,6 +389,18 @@ int Reader::read(DeflatedBuffer &input) {
 template <>
 void Reader::skip<int>(DeflatedBuffer &input) {
     skipInt(input);
+}
+
+
+template <>
+bool Reader::read(DeflatedBuffer &input) {
+    uint8_t c = input.getChar();
+    return c == 1;
+}
+
+template <>
+void Reader::skip<bool>(DeflatedBuffer &input) {
+    input.skip(1);
 }
 
 bool Reader::eof() {
@@ -498,12 +510,6 @@ double Reader::readDouble(DeflatedBuffer &input) {
     input.read(reinterpret_cast<char *>(&buffer.bytes[0]), sizeof buffer.bytes);
 
     return buffer.result;
-}
-
-bool Reader::readBoolean(DeflatedBuffer &input) {
-    uint8_t c = input.getChar();
-
-    return c == 1;
 }
 
 dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, const header &header) {

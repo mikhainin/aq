@@ -31,6 +31,7 @@ namespace client
 
         void operator()(qi::info::nil) const {}
         void operator()(int n) const { std::cout << n; }
+        void operator()(bool b) const { std::cout << (b ? "true" : "false"); }
         void operator()(const std::string &s) const { std::cout << s; }
         void operator()(const equality_expression &s) const {
             std::cout << s.identifier << (s.op == s.EQ ? "==" : "!=");
@@ -71,6 +72,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             using qi::_val;
             using qi::_1;
             using qi::int_;
+            using qi::bool_;
             using qi::string;
             using qi::lexeme;
             using qi::lit;
@@ -84,6 +86,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
 
             constant =
                   int_              [_val = _1 ]
+                | bool_             [_val = _1 ]
                 | quoted_string     [_val = _1 ]
                 | lit("nil")        [_val = nil()];
 

@@ -66,5 +66,18 @@ void Predicate::apply<long>(const long &i) {
 }
 
 
+template<>
+void Predicate::apply<bool>(const bool &b) {
+    // TODO: use pattern "strategy" here
+    if (expr->op == filter::equality_expression::EQ) {
+        expr->setState(boost::get<bool>(expr->constant) == b);
+    } else if (expr->op == filter::equality_expression::NE) {
+        expr->setState(boost::get<bool>(expr->constant) != b);
+    } else {
+        assert(false && "expr->op contains unknown operator");
+    }
+}
+
+
 }
 }

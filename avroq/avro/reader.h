@@ -84,7 +84,6 @@ private:
     void skipInt(DeflatedBuffer &input);
     float readFloat(DeflatedBuffer &input);
     double readDouble(DeflatedBuffer &input);
-    bool readBoolean(DeflatedBuffer &input);
 
     void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema);

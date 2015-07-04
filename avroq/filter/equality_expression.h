@@ -21,6 +21,7 @@ namespace filter {
             boost::variant<
                 nil
               , int
+              , bool
               , std::string
             > type;
 
