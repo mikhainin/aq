@@ -45,7 +45,6 @@ public:
     const std::string &getItemName() const;
 
     int getNumber() const;
-    //virtual void dump(std::function<void(std::string)> &dumper) = 0;
 
 private:
     int number;

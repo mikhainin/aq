@@ -119,14 +119,30 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
 
         if (filterNode->is<node::Union>()) {
             for( auto &p : filterNode->as<node::Union>().getChildren()) {
-                if (p->isOneOf<node::String, node::Int, node::Long, node::Boolean>()) {
-                    filterNode = p.get();
+                filterNode = p.get();
+                if (filterNode->is<node::Custom>()) {
+                    filterNode = filterNode->as<node::Custom>().getDefinition().get();
+                }
+                if (filterNode->isOneOf<node::String, node::Int, node::Long, node::Boolean, node::Enum>()) {
                     break;
-                }/* else if (p->is<node::Int>() || p->is<node::Long>()) {
-                    filterNode = p.get();
-                    break;
-                }*/
+                }
             }
+        }
+        if (filterNode->isOneOf<node::String, node::Int, node::Long, node::Boolean>()) {
+            ; // ok
+        } else if (filterNode->is<node::Enum>()) {
+            auto const &e = filterNode->as<node::Enum>();
+            int i = e.findIndexForValue(boost::get<std::string>(filterPredicate->constant));
+            if (i == -1) {
+                // TODO: add list of valid values
+                throw std::runtime_error("Invalid value for enum field '" + filterPredicate->identifier + "'");
+            }
+            filterPredicate->constant = i;
+        } else {
+            throw std::runtime_error(
+                "Sorry, but type '" + filterNode->getTypeName() +
+                "' for field '" + filterPredicate->identifier + "' "
+                "Is not yet supported in filter expression.");
         }
         d->filterItems.insert(
                 std::make_pair(
@@ -191,8 +207,7 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
     } else if (schema->is<node::Custom>()) {
         decodeDocument(stream, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Enum>()) {
-        int index = readZigZagLong(stream);
-        (void)index;
+        skipOrApplyFilter<int>(stream, schema);
     } else if (schema->is<node::Array>()) {
         auto const &node = schema->as<node::Array>().getItemsType();
 
