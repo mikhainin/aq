@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ostream>
+#include <sstream>
 #include <map>
 
 #include <avro/node/all_nodes.h>
@@ -50,7 +51,6 @@ class Tsv {
 public:
     Tsv(const TsvExpression &wd) : whatDump(wd) {
     	toDump.resize(whatDump.pos);
-    	// std::cout << "TsvDumper() " << whatDump.what.size() << std::endl;
     }
 
     template<typename T, typename NodeType>
@@ -58,8 +58,6 @@ public:
     	auto p = whatDump.what.find(n.getNumber());
     	if (p != whatDump.what.end()) {
             toDump[p->second].reset(new TDumper<T>(t));
-    	} else {
-            // std::cout << "NOT adding " << n.getItemName() << " num=" << n.getNumber() << " pos = " << p->second << " addIfNecessary() " << whatDump.what.size() << std::endl;
     	}
     }
 
@@ -68,14 +66,11 @@ public:
     }
 
     void MapName(const StringBuffer &name) {
-        // std::cout << indents[level] << s;
     }
 
     void MapValue(const StringBuffer &s, const node::String &n) {
-        //std::cout << ": \"" << s  << "\"" << std::endl;
     }
     void MapValue(int i, const node::Int &n) {
-        //std::cout << ": \"" << s  << "\"" << std::endl;
     }
 
     void Int(int i, const node::Int &n) {
@@ -133,20 +128,24 @@ public:
 
     void EndDocument() {
     	auto p = toDump.begin();
-    	(*p)->dump(std::cout);
+    	(*p)->dump(outStream);
     	// std::cout << *p;
     	++p;
     	while(p != toDump.end()) {
-    		std::cout << "\t";
-    		(*p)->dump(std::cout);
+    		outStream << "\t";
+    		(*p)->dump(outStream);
     		++p;
     	}
-    	std::cout << std::endl;
+    	outStream << std::endl;
+
+        const auto &str = outStream.str();
+        std::cout.write(str.data(), str.size());
     }
 
 private:
     std::vector<std::unique_ptr<Dumper>> toDump;
     const TsvExpression &whatDump;
+    std::ostringstream outStream;
 };
 
 

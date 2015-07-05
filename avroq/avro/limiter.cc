@@ -13,7 +13,7 @@ Limiter::Limiter(int limit) : limit(limit) {
 
 void Limiter::documentFinished() {
     --limit;
-    if (limit == 0) {
+    if (limit <= 0) {
         throw Finished();
     }
 }

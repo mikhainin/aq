@@ -6,6 +6,7 @@
 #include <type_traits>
 
 namespace avro {
+namespace node {
 
 class Node {
 public:
@@ -53,6 +54,6 @@ private:
 };
 
 }
-
+}
 
 #endif /* AVROQ_AVRO_SCHEMANODE_H_ */

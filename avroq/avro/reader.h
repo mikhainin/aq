@@ -23,14 +23,17 @@ namespace filter {
 }
 
 namespace avro {
+namespace node {
+    class Node;
+}
 
-class Node;
+struct Block;
 class DeflatedBuffer;
 class Limiter;
 
 struct header {
     std::map<std::string, std::string> metadata;
-    std::unique_ptr<Node> schema;
+    std::unique_ptr<node::Node> schema;
     int nodesNumber = 0;
     char sync[16] = {0}; // TODO sync length to a constant
 };
@@ -59,6 +62,9 @@ public:
 
     header readHeader();
 
+    std::unique_ptr<Block> nextBlock(const header &header);
+
+
     void readBlock(const header &header, const dumper::TsvExpression &wd);
 
     dumper::TsvExpression compileFieldsList(const std::string &filedList, const header &header);
@@ -82,18 +88,18 @@ private:
     void skipString(DeflatedBuffer &input);
     void skipInt(DeflatedBuffer &input);
 
-    void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
-    void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema);
+    void dumpShema(const std::unique_ptr<node::Node> &schema, int level = 0) const;
+    void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 
     //void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
 
     template <class T>
-    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper);
+    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema, T &dumper);
 
-    const Node* schemaNodeByPath(const std::string &path, const header &header);
+    const node::Node* schemaNodeByPath(const std::string &path, const header &header);
 
     template <class T>
-    void skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema);
+    void skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 };
 
 }

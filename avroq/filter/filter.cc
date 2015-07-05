@@ -1,7 +1,6 @@
 #include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
 
-#include "detail/ast.hpp"
 #include "equality_expression.h"
 
 #include "filter.h"
@@ -104,14 +103,14 @@ struct ExpressionResetter
     }
 };
 
-Filter::Filter(std::shared_ptr<detail::expression_ast> ast) : ast(ast) {
+Filter::Filter(const detail::expression_ast &ast) : ast(ast) {
     ExpressionExtractor extractor(*this);
-    extractor(*ast);
+    extractor(this->ast);
 }
 
 bool Filter::expressionPassed() const {
     AstRunner runner;
-    return runner(*ast);
+    return runner(ast);
 }
 
 void Filter::addExpression(equality_expression&expr) {
@@ -134,7 +133,7 @@ const std::vector<equality_expression*> &Filter::getPredicates() {
 
 void Filter::resetState() {
     ExpressionResetter reset;
-    reset(*ast);
+    reset(ast);
 }
 
 }

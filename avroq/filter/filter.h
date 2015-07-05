@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "detail/ast.hpp"
+
 namespace filter {
 
 namespace detail {
@@ -13,8 +15,10 @@ namespace detail {
 struct equality_expression;
 
 class Filter {
+    Filter() = delete;
+    Filter(const Filter&) = delete;
 public:
-    explicit Filter(std::shared_ptr<detail::expression_ast> ast);
+    explicit Filter(const detail::expression_ast &ast);
 
     void addExpression(equality_expression &expr);
     std::vector<std::string> getUsedPaths() const;
@@ -22,7 +26,7 @@ public:
     bool expressionPassed() const;
     void resetState();
 private:
-    std::shared_ptr<detail::expression_ast> ast;
+    detail::expression_ast ast;
     std::vector<equality_expression*> predicateList;
 };
 

@@ -156,10 +156,10 @@ std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
 
     std::string::const_iterator iter = str.begin();
     std::string::const_iterator end = str.end();
-    std::shared_ptr<detail::expression_ast> ast = std::make_shared<detail::expression_ast>();
+    detail::expression_ast ast; // = std::make_shared<detail::expression_ast>();
     // ast_print printer;
     calculator calc; // Our grammar
-    bool r = phrase_parse(iter, end, calc, space, *ast);
+    bool r = phrase_parse(iter, end, calc, space, ast);
 
     if (r && iter == end)
     {

@@ -15,25 +15,25 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include <boost/lexical_cast.hpp>
-
 #include <filter/filter.h>
 #include <filter/equality_expression.h>
 
-#include "schemareader.h"
-#include "limiter.h"
 
 #include "dumper/tsv.h"
 #include "dumper/fool.h"
 
 #include "node/all_nodes.h"
+#include "node/nodebypath.h"
 
+#include "block.h"
 #include "deflatedbuffer.h"
 #include "filehandler.h"
+#include "limiter.h"
 #include "predicate/predicate.h"
+#include "reader.h"
+#include "schemareader.h"
 #include "stringbuffer.h"
 #include "zigzag.hpp"
-#include "reader.h"
 
 namespace {
 const std::string AVRO_MAGICK = "Obj\001"; // 4 bytes
@@ -52,7 +52,7 @@ public:
 
     FileHandle file;
     std::shared_ptr<filter::Filter> filter;
-    std::unordered_multimap<const Node *, std::shared_ptr<predicate::Predicate>> filterItems;
+    std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>> filterItems;
 
     Private(const std::string& filename, Limiter &limit) : filename(filename), limit(limit), file(filename) {
     }
@@ -170,7 +170,7 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
     d->filter = filter;
 
     for(auto &filterPredicate : filter->getPredicates()) {
-        const Node * filterNode = schemaNodeByPath(filterPredicate->identifier, header);
+        const node::Node * filterNode = schemaNodeByPath(filterPredicate->identifier, header);
 
         if (filterNode->is<node::Union>()) {
             for( auto &p : filterNode->as<node::Union>().getChildren()) {
@@ -221,6 +221,20 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
     }
 }
 
+std::unique_ptr<Block> Reader::nextBlock(const header &header) {
+
+    int64_t objectCountInBlock = readZigZagLong(*d->input);
+    int64_t blockBytesNum = readZigZagLong(*d->input);
+    std::unique_ptr<Block> block(new Block);
+
+    block->buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
+    block->objectCount = objectCountInBlock;
+
+    return block;
+
+}
+
+
 void Reader::readBlock(const header &header, const dumper::TsvExpression &wd) {
 
     int64_t objectCountInBlock = readZigZagLong(*d->input);
@@ -266,7 +280,7 @@ void Reader::readBlock(const header &header, const dumper::TsvExpression &wd) {
 
 }
 
-void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema) {
+void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema) {
     if (schema->is<node::Record>()) {
         for(auto &p : schema->as<node::Record>().getChildren()) {
             decodeDocument(stream, p);
@@ -325,7 +339,7 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> 
     }
 }
 template <class T>
-void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper) {
+void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema, T &dumper) {
     if (schema->is<node::Record>()) {
 
         auto &r = schema->as<node::Record>();
@@ -422,7 +436,7 @@ void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &s
 }
 
 template <typename T>
-void Reader::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema) {
+void Reader::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema) {
     if (d->filter) {
         auto range = d->filterItems.equal_range(schema.get());
         if (range.first != range.second) {
@@ -434,12 +448,10 @@ void Reader::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<Nod
                     filterItem.second->template apply<T>(value);
                 }
             );
-        } else {
-            skip<T>(stream);
+            return;
         }
-    } else {
-        skip<T>(stream);
     }
+    skip<T>(stream);
 }
 
 template <>
@@ -539,7 +551,7 @@ bool Reader::eof() {
 }
 
 
-void Reader::dumpShema(const std::unique_ptr<Node> &schema, int level) const {
+void Reader::dumpShema(const std::unique_ptr<node::Node> &schema, int level) const {
     if (schema->is<node::Record>()) {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -635,51 +647,21 @@ dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, co
         if (node->is<node::Union>()) {
         	for( auto &p : node->as<node::Union>().getChildren()) {
         		result.what[p->getNumber()] = result.pos;
-        		// std::cout << p->getItemName() << ':' << p->getTypeName() << " num=" << p->getNumber() << " pos = " << result.pos << std::endl;
         	}
         }
-        // std::cout << node->getItemName() << ':' << node->getTypeName() << " num=" << node->getNumber() << " pos = " << result.pos << std::endl;
         result.pos++;
     }
 
-    // std::cout << "compile " << result.what.size() << std::endl;
     return result;
 
 }
 
-const Node *Reader::schemaNodeByPath(const std::string &path, const header &header) {
-    std::vector<std::string> chunks;
-    boost::algorithm::split(chunks, path, boost::is_any_of("."));
-
-    auto currentNode = header.schema.get();
-
-    for(auto p = chunks.begin(); p != chunks.end(); ++p) {
-        //std::cout << "XX " << *p << std::endl;
-        if (currentNode->is<node::Custom>()) {
-            currentNode = currentNode->as<node::Custom>().getDefinition().get();
-        }
-        if (currentNode->is<node::Record>()) {
-            for( auto &n : currentNode->as<node::Record>().getChildren()) {
-                //std::cout << "checking " << n->getItemName() << std::endl;
-                if (n->getItemName() == *p) {
-                    //std::cout << " found " << *p << std::endl;
-                    currentNode = n.get();
-                    goto next;
-                }
-            }
-            // std::cout << " not found " << *p << std::endl;
-            throw PathNotFound(path);
-        } else {
-            // std::cout << "Can't find path" << std::endl;
-            throw PathNotFound(path);
-        }
-
+const node::Node* Reader::schemaNodeByPath(const std::string &path, const header &header) {
+    auto n = node::nodeByPath(path, header.schema.get());
+    if (n == nullptr) {
         throw PathNotFound(path);
-next://
-        (void)currentNode;
     }
-
-    return currentNode;
+    return n;
 }
 
 }

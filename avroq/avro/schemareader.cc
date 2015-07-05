@@ -91,31 +91,31 @@ public:
     }
 };
 
-std::unique_ptr<Node> SchemaReader::nodeByTypeName(const std::string &typeName, const std::string &itemName) {
+std::unique_ptr<node::Node> SchemaReader::nodeByTypeName(const std::string &typeName, const std::string &itemName) {
     if (typeName == "record") {
-        return std::unique_ptr<Node>(new node::Record(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Record(currentIndex++, itemName));
     } else if (typeName == "enum") {
-        return std::unique_ptr<Node>(new node::Enum(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Enum(currentIndex++, itemName));
     } else if (typeName == "array") {
-        return std::unique_ptr<Node>(new node::Array(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Array(currentIndex++, itemName));
     } else if (typeName == "string") {
-        return std::unique_ptr<Node>(new node::String(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::String(currentIndex++, itemName));
     } else if (typeName == "bytes") { // TODO: make real type "bytes"
-        return std::unique_ptr<Node>(new node::String(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::String(currentIndex++, itemName));
     } else if (typeName == "int") {
-        return std::unique_ptr<Node>(new node::Int(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Int(currentIndex++, itemName));
     } else if (typeName == "long") {
-        return std::unique_ptr<Node>(new node::Long(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Long(currentIndex++, itemName));
     } else if (typeName == "float") {
-        return std::unique_ptr<Node>(new node::Float(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Float(currentIndex++, itemName));
     } else if (typeName == "double") {
-        return std::unique_ptr<Node>(new node::Double(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Double(currentIndex++, itemName));
     } else if (typeName == "boolean") {
-        return std::unique_ptr<Node>(new node::Boolean(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Boolean(currentIndex++, itemName));
     } else if (typeName == "null") {
-        return std::unique_ptr<Node>(new node::Null(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Null(currentIndex++, itemName));
     } else if (typeName == "map") {
-        return std::unique_ptr<Node>(new node::Map(currentIndex++, itemName));
+        return std::unique_ptr<node::Node>(new node::Map(currentIndex++, itemName));
     }
     throw std::runtime_error("unknown node type: '" + typeName + "' for node '" + itemName + "'");
 }
@@ -126,7 +126,7 @@ SchemaReader::SchemaReader(const std::string &schemaJson) : schemaJson(schemaJso
 SchemaReader::~SchemaReader() {
 }
 
-std::unique_ptr<Node> SchemaReader::parse() {
+std::unique_ptr<node::Node> SchemaReader::parse() {
     std::istringstream ss(schemaJson);
 
     using boost::property_tree::ptree;
@@ -136,11 +136,11 @@ std::unique_ptr<Node> SchemaReader::parse() {
     return parseOneJsonObject(pt);
 }
 
-std::unique_ptr<Node> SchemaReader::parseOneJsonObject(const boost::property_tree::ptree &node) {
+std::unique_ptr<node::Node> SchemaReader::parseOneJsonObject(const boost::property_tree::ptree &node) {
 
     auto descriptor = descriptorForJsonObject(node);
 
-    std::unique_ptr<Node> newNode = nodeByType(node.get_child("type"), descriptor->name);
+    std::unique_ptr<node::Node> newNode = nodeByType(node.get_child("type"), descriptor->name);
     assert(newNode.get() != nullptr);
 
     if (newNode->is<node::Record>()) {
@@ -159,18 +159,18 @@ std::unique_ptr<Node> SchemaReader::parseOneJsonObject(const boost::property_tre
 
 }
 
-std::unique_ptr<Node> SchemaReader::nodeByType(const boost::property_tree::ptree &type,
+std::unique_ptr<node::Node> SchemaReader::nodeByType(const boost::property_tree::ptree &type,
                                                      const std::string &nodeName) {
     if (isValue(type)) {
         return nodeByTypeName(type.data(), nodeName);
     } else if(isObject(type)) {
-        auto newNode = std::unique_ptr<Node>(new node::Custom(currentIndex++, nodeName));
+        auto newNode = std::unique_ptr<node::Node>(new node::Custom(currentIndex++, nodeName));
         if (newNode->is<node::Custom>()) {
             newNode->as<node::Custom>().setDefinition(parseOneJsonObject(type));
         }
         return newNode;
     } else if (isArray(type)) {
-        return std::unique_ptr<Node>(new node::Union(currentIndex++, nodeName));
+        return std::unique_ptr<node::Node>(new node::Union(currentIndex++, nodeName));
     } else {
         throw std::runtime_error("smth wrong with 'type' for node '" + nodeName + "'");
     }
