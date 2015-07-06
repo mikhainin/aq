@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ostream>
 #include <string>
+#include <algorithm>
 
 namespace avro {
 

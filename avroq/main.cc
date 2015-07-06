@@ -33,7 +33,7 @@ int main(int argc, const char * argv[]) {
         ("input-file,f", po::value< std::vector<std::string> >(), "input files")
         ("condition,c", po::value< std::string >(&condition), "expression")
         ("limit,n", po::value< int >(&limit)->default_value(-1), "maximum number of records (default -1 means no limit)")
-        ("fields,l", po::value< std::string >(&fields), "fields to output (order is not preserverd YET)")
+        ("fields,l", po::value< std::string >(&fields), "fields to output")
         ("print-file", po::bool_switch(&printProcessingFile), "Print name of processing file")
     ;
     po::positional_options_description p;

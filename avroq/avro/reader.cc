@@ -252,7 +252,7 @@ void Reader::readBlock(const header &header, const dumper::TsvExpression &wd) {
             if (!d->filter || d->filter->expressionPassed()) {
                 d->deflate_buffer.resetToDocument();
                 if (wd.pos > 0) {
-                    auto dumper = dumper::Tsv(wd);
+                    dumper::Tsv dumper(wd);
                     dumpDocument(d->deflate_buffer, header.schema, dumper);
                     dumper.EndDocument();
                 } else {
