@@ -1,11 +1,13 @@
 add_library(avro
+                 blockdecoder.cc
+                 exception.cc
+                 deflatedbuffer.cc
+                 filehandler.cc
+                 limiter.cc
 				 reader.cc
 				 schemareader.cc
                  stringbuffer.cc
-                 deflatedbuffer.cc
-                 limiter.cc
-                 filehandler.cc
-                 
+
 # TODO: move to subfolder
                  node/array.cc
                  node/boolean.cc

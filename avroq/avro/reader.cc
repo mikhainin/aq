@@ -221,16 +221,21 @@ void Reader::setFilter(std::shared_ptr<filter::Filter> filter, const header &hea
     }
 }
 
-std::unique_ptr<Block> Reader::nextBlock(const header &header) {
+void Reader::nextBlock(const header &header, avro::Block &block) {
 
     int64_t objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
-    std::unique_ptr<Block> block(new Block);
 
-    block->buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
-    block->objectCount = objectCountInBlock;
 
-    return block;
+    block.buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
+    block.objectCount = objectCountInBlock;
+
+    char tmp_sync[16] = {0}; // TODO sync length to a constant
+    d->input->read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
+
+    if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
+        throw std::runtime_error("Sync match failed");
+    }
 
 }
 
@@ -239,11 +244,11 @@ void Reader::readBlock(const header &header, const dumper::TsvExpression &wd) {
 
     int64_t objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
-
+(void)objectCountInBlock;
     if (header.metadata.at("avro.codec") == "deflate") { // TODO: check it once
 
         d->deflate_buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
-
+/*
         for(int i = 0; i < objectCountInBlock; ++i) {
             // TODO: rewrite it using hierarcy of filters/decoders.
             // TODO: implement counter as a filter  
@@ -266,7 +271,7 @@ void Reader::readBlock(const header &header, const dumper::TsvExpression &wd) {
                 }
             }
         }
-
+*/
         char tmp_sync[16] = {0}; // TODO sync length to a constant
         d->input->read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
 
@@ -338,6 +343,7 @@ void Reader::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::
         }
     }
 }
+
 template <class T>
 void Reader::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema, T &dumper) {
     if (schema->is<node::Record>()) {

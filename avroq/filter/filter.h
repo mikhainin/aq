@@ -16,9 +16,9 @@ struct equality_expression;
 
 class Filter {
     Filter() = delete;
-    Filter(const Filter&) = delete;
 public:
     explicit Filter(const detail::expression_ast &ast);
+    explicit Filter(const Filter& oldFilter);
 
     void addExpression(equality_expression &expr);
     std::vector<std::string> getUsedPaths() const;

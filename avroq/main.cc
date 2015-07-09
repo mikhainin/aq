@@ -2,8 +2,12 @@
 #include <iostream>
 #include <string>
 
+#include <thread>
+
 #include <boost/program_options.hpp>
 
+#include "avro/block.h"
+#include "avro/blockdecoder.h"
 #include "avro/reader.h"
 #include "avro/eof.h"
 #include "avro/finished.h"
@@ -16,7 +20,38 @@
 
 namespace po = boost::program_options;
 
+std::mutex screenMutex;
 
+void outDocument(const std::string &what) {
+    std::lock_guard<std::mutex> screenLock(screenMutex);
+    std::cout.write(what.data(), what.size());
+}
+
+std::mutex readerMutex;
+
+void processFile(avro::BlockDecoder &decoder, avro::Reader &reader, const avro::header &header) {
+                    
+    avro::Block block;
+    try {
+        while (true) {
+            // TODO: use one/set of buffers
+            {
+                std::lock_guard<std::mutex> readerLock(readerMutex);
+                if (reader.eof()) {
+                    break;
+                }
+                reader.nextBlock(header, block);
+            }
+            decoder.decodeAndDumpBlock(block);
+            //reader.readBlock(header, wd);
+        }
+    } catch (const avro::Eof &e) {
+        ; // reading done
+    } catch (const avro::Finished &e) {
+        ;
+    }
+
+}
 
 int main(int argc, const char * argv[]) {
 
@@ -24,6 +59,7 @@ int main(int argc, const char * argv[]) {
 
     std::string condition;
     int limit = -1;
+    u_int jobs = 4;
     std::string fields;
     bool printProcessingFile = false;
 
@@ -35,6 +71,7 @@ int main(int argc, const char * argv[]) {
         ("limit,n", po::value< int >(&limit)->default_value(-1), "maximum number of records (default -1 means no limit)")
         ("fields,l", po::value< std::string >(&fields), "fields to output")
         ("print-file", po::bool_switch(&printProcessingFile), "Print name of processing file")
+        ("jobs,j", po::value< u_int >(&jobs), "Number of threads to run")
     ;
     po::positional_options_description p;
     p.add("input-file", -1);
@@ -65,7 +102,7 @@ int main(int argc, const char * argv[]) {
                 
                 avro::header header = reader.readHeader();
 
-                auto wd = reader.compileFieldsList(fields, header);
+                auto tsvFieldsList = reader.compileFieldsList(fields, header);
 
                 if (!condition.empty()) {
                     filter = filterCompiler.compile(condition);
@@ -73,15 +110,31 @@ int main(int argc, const char * argv[]) {
                 }
 
                 try {
-                    while (not reader.eof()) {
-                        reader.readBlock(header, wd);
+                    avro::BlockDecoder decoder(header, limiter);
+                    if (filter) {
+                        decoder.setFilter(std::unique_ptr<filter::Filter>(new filter::Filter(*filter)));
+                    }
+                    decoder.setTsvFilterExpression(tsvFieldsList);
+                    decoder.setDumpMethod(outDocument);
+                    
+                    std::vector<std::thread> workers;
+                    for(u_int i = 0; i < jobs; ++i) { // TODO: check for inadequate values
+                        workers.emplace_back(
+                            std::thread(
+                                std::bind(processFile, std::ref(decoder), std::ref(reader), std::ref(header))
+                            )
+                        );
+                    }
+                    for(auto &p : workers) {
+                        p.join();
                     }
                 } catch (const avro::Eof &e) {
                     ; // reading done
                 }
+                if (limiter.finished()) {
+                    break;
+                }
             }
-        } catch (const avro::Finished &e) {
-            ;
         } catch (const avro::Reader::PathNotFound &e) {
         	std::cerr << "can't locate path '" << e.getPath() << "'" << std::endl;
         } catch (const std::runtime_error &e) {

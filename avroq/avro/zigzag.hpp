@@ -1,11 +1,3 @@
-//
-//  zigzag.hpp
-//  avroq
-//
-//  Created by Mikhail Galanin on 08/04/15.
-//  Copyright (c) 2015 Mikhail Galanin. All rights reserved.
-//
-
 #ifndef avroq_zigzag_hpp
 #define avroq_zigzag_hpp
 
@@ -36,14 +28,30 @@ long readZigZagLong(BufferType &b) {
         encoded |= static_cast<uint64_t>(u & 0x7f) << shift;
         shift += 7;
 
-        // d->read.push_back(u);
-
-
     } while (u & 0x80);
     
     return decodeZigzag64(encoded);
 
 }
+
+template <class BufferType>
+inline
+void skipZigZagLong(BufferType &b) {
+    int shift = 0;
+    uint8_t u;
+    do {
+        if (shift >= 64) {
+            if (b.eof()) {
+                throw Eof();
+            }
+            throw std::runtime_error("Invalid Avro varint");
+        }
+        u = static_cast<uint8_t>(b.getChar());
+        shift += 7;
+
+    } while (u & 0x80);
+}
+
 
 }
 #endif

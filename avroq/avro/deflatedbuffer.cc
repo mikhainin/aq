@@ -9,7 +9,7 @@
 namespace avro {
 
 DeflatedBuffer::DeflatedBuffer() {
-    buf.resize(5 * 1024 * 1024);
+    buf.resize(15 * 1024 * 1024);
 }
 
 void DeflatedBuffer::assignData(const char *compressedData, size_t compressedDataLength) {

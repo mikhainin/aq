@@ -1,11 +1,3 @@
-//
-//  avroreader.h
-//  avroq
-//
-//  Created by Mikhail Galanin on 12/12/14.
-//  Copyright (c) 2014 Mikhail Galanin. All rights reserved.
-//
-
 #ifndef __avroq__avroreader__
 #define __avroq__avroreader__
 
@@ -13,8 +5,7 @@
 #include <cstdint>
 #include <map>
 
-#include <boost/iostreams/filtering_stream.hpp>
-
+#include "header.h"
 #include "stringbuffer.h"
 #include "dumper/tsvexpression.h"
 
@@ -30,14 +21,6 @@ namespace node {
 struct Block;
 class DeflatedBuffer;
 class Limiter;
-
-struct header {
-    std::map<std::string, std::string> metadata;
-    std::unique_ptr<node::Node> schema;
-    int nodesNumber = 0;
-    char sync[16] = {0}; // TODO sync length to a constant
-};
-
 
 class Reader {
 public:
@@ -62,8 +45,7 @@ public:
 
     header readHeader();
 
-    std::unique_ptr<Block> nextBlock(const header &header);
-
+    void nextBlock(const header &header, avro::Block &block);
 
     void readBlock(const header &header, const dumper::TsvExpression &wd);
 

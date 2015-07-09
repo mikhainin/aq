@@ -126,7 +126,7 @@ public:
     void MapEnd(const node::Map &m) {
     }
 
-    void EndDocument() {
+    void EndDocument(std::function<void(const std::string &)> dumpMethod) {
     	auto p = toDump.begin();
     	(*p)->dump(outStream);
     	// std::cout << *p;
@@ -139,7 +139,8 @@ public:
     	outStream << std::endl;
 
         const auto &str = outStream.str();
-        std::cout.write(str.data(), str.size());
+        dumpMethod(str);
+        // std::cout.write(str.data(), str.size());
     }
 
 private:

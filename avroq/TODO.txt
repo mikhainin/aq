@@ -19,6 +19,7 @@ check condition after last used schema node
 records separator via command-line argument
 tail mode
 progressbar
+[bug] deflated buffer should grow dinamically
 
 Long term TODO
 ==============
