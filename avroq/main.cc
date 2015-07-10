@@ -11,6 +11,7 @@
 #include "avro/blockdecoder.h"
 #include "avro/reader.h"
 #include "avro/eof.h"
+#include "avro/exception.h"
 #include "avro/finished.h"
 #include "avro/limiter.h"
 // TODO: remove this include (node.h) from this file as it's an implementation detail
@@ -99,7 +100,7 @@ int main(int argc, const char * argv[]) {
                     std::cerr << "Processing " << p << std::endl;
                 }
 
-                avro::Reader reader(p, limiter);
+                avro::Reader reader(p);
                 
                 avro::header header = reader.readHeader();
 
@@ -107,7 +108,6 @@ int main(int argc, const char * argv[]) {
 
                 if (!condition.empty()) {
                     filter = filterCompiler.compile(condition);
-                    reader.setFilter(filter, header);
                 }
 
                 try {
@@ -136,7 +136,7 @@ int main(int argc, const char * argv[]) {
                     break;
                 }
             }
-        } catch (const avro::Reader::PathNotFound &e) {
+        } catch (const avro::PathNotFound &e) {
         	std::cerr << "can't locate path '" << e.getPath() << "'" << std::endl;
         } catch (const std::runtime_error &e) {
             std::cerr << e.what() << std::endl;
