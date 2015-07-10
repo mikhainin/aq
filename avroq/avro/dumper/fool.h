@@ -46,7 +46,7 @@ public:
     }
 
     void Int(int i, const node::Int &n) {
-        std::cout << indents[level] << n.getItemName() << ':' << ' ' << i << std::endl;
+        outStream << indents[level] << n.getItemName() << ':' << ' ' << i << std::endl;
     }
 
     void Long(long l, const node::Long &n) {
