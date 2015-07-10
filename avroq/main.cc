@@ -3,6 +3,7 @@
 #include <string>
 
 #include <thread>
+#include <mutex>
 
 #include <boost/program_options.hpp>
 

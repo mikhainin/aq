@@ -161,11 +161,11 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         if (!filter || filter->expressionPassed()) {
             block.buffer.resetToDocument();
             if (tsvFieldsList.pos > 0) {
-                auto dumper = dumper::Tsv(tsvFieldsList);
+                dumper::Tsv dumper(tsvFieldsList);
                 dumpDocument(block.buffer, header.schema, dumper);
                 dumper.EndDocument(dumpMethod);
             } else {
-                auto dumper = dumper::Fool();
+                dumper::Fool dumper;
                 dumpDocument(block.buffer, header.schema, dumper);
                 dumper.EndDocument(dumpMethod);
             }
