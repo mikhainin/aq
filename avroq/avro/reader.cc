@@ -17,7 +17,7 @@
 #include "zigzag.hpp"
 
 namespace {
-const std::string AVRO_MAGICK = "Obj\001"; // 4 bytes
+    const std::string AVRO_MAGICK = "Obj\001"; // 4 bytes
 }
 
 namespace avro {

@@ -61,7 +61,13 @@ int main(int argc, const char * argv[]) {
     std::shared_ptr<filter::Filter> filter;
 
     if (!condition.empty()) {
-        filter = filterCompiler.compile(condition);
+        try {
+            filter = filterCompiler.compile(condition);
+        } catch(const filter::Compiler::CompileError &e) {
+            std::cerr << "Condition complile failed: " << std::endl;
+            std::cerr << e.what() << std::endl;
+            return 1;
+        }
     }
 
     if (vm.count("input-file")) {

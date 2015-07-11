@@ -4,7 +4,6 @@ threading
 operators == nil, ~= nil
 validate if the field is nullable
 validate if the operation is viable for this field
-throw error when unable to compile condition
 
 TODO
 ====
