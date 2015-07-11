@@ -24,13 +24,12 @@ namespace avro {
 
 class Reader::Private {
 public:
-    std::string filename; // TODO: move to FileHandle
 
     std::unique_ptr<StringBuffer> input;
 
     FileHandle file;
 
-    Private(const std::string& filename) : filename(filename), file(filename) {
+    Private(const std::string& filename) : file(filename) {
     }
 };
 
@@ -88,14 +87,12 @@ header Reader::readHeader() {
 
 
 
-void Reader::nextBlock(const header &header, avro::Block &block) {
+avro::StringBuffer Reader::nextBlock(const header &header, int64_t &objectCountInBlock ) {
 
-    int64_t objectCountInBlock = readZigZagLong(*d->input);
+    objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
 
-
-    block.buffer.assignData(d->input->getAndSkip(blockBytesNum), blockBytesNum);
-    block.objectCount = objectCountInBlock;
+    avro::StringBuffer result(d->input->getAndSkip(blockBytesNum), blockBytesNum);
 
     char tmp_sync[16] = {0}; // TODO sync length to a constant
     d->input->read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
@@ -103,6 +100,8 @@ void Reader::nextBlock(const header &header, avro::Block &block) {
     if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
         throw std::runtime_error("Sync match failed");
     }
+
+    return result;
 
 }
 

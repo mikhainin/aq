@@ -1,6 +1,6 @@
 
-#ifndef _nil_h
-#define _nil_h
+#ifndef _filter_nil_h
+#define _filter_nil_h
 
 struct nil {
 };

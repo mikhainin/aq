@@ -6,6 +6,7 @@
 #include <map>
 
 #include "header.h"
+#include "stringbuffer.h"
 #include "dumper/tsvexpression.h"
 
 namespace avro {
@@ -24,6 +25,7 @@ public:
     header readHeader();
 
     void nextBlock(const header &header, avro::Block &block);
+    avro::StringBuffer nextBlock(const header &header, int64_t &objectCountInBlock );
 
     dumper::TsvExpression compileFieldsList(const std::string &filedList, const header &header);
 
@@ -38,8 +40,6 @@ private:
 
     const node::Node* schemaNodeByPath(const std::string &path, const header &header);
 
-    template <class T>
-    void skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 };
 
 }

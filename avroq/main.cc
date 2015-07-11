@@ -7,19 +7,14 @@
 
 #include <boost/program_options.hpp>
 
-#include "avro/block.h"
-#include "avro/blockdecoder.h"
-#include "avro/reader.h"
-#include "avro/eof.h"
-#include "avro/exception.h"
-#include "avro/finished.h"
-#include "avro/limiter.h"
 // TODO: remove this include (node.h) from this file as it's an implementation detail
 #include "avro/node/node.h"
 
 #include "filter/filter.h"
 #include "filter/compiler.h"
 
+#include "fileemitor.h"
+#include "worker.h"
 namespace po = boost::program_options;
 
 std::mutex screenMutex;
@@ -27,32 +22,6 @@ std::mutex screenMutex;
 void outDocument(const std::string &what) {
     std::lock_guard<std::mutex> screenLock(screenMutex);
     std::cout.write(what.data(), what.size());
-}
-
-std::mutex readerMutex;
-
-void processFile(avro::BlockDecoder &decoder, avro::Reader &reader, const avro::header &header) {
-                    
-    avro::Block block;
-    try {
-        while (true) {
-            // TODO: use one/set of buffers
-            {
-                std::lock_guard<std::mutex> readerLock(readerMutex);
-                if (reader.eof()) {
-                    break;
-                }
-                reader.nextBlock(header, block);
-            }
-            decoder.decodeAndDumpBlock(block);
-            //reader.readBlock(header, wd);
-        }
-    } catch (const avro::Eof &e) {
-        ; // reading done
-    } catch (const avro::Finished &e) {
-        ;
-    }
-
 }
 
 int main(int argc, const char * argv[]) {
@@ -91,55 +60,31 @@ int main(int argc, const char * argv[]) {
     filter::Compiler filterCompiler;
     std::shared_ptr<filter::Filter> filter;
 
+    if (!condition.empty()) {
+        filter = filterCompiler.compile(condition);
+    }
+
     if (vm.count("input-file")) {
-        try {
-            avro::Limiter limiter(limit);
-            for(const auto &p : vm["input-file"].as< std::vector<std::string> >()) {
 
-                if (printProcessingFile) {
-                    std::cerr << "Processing " << p << std::endl;
-                }
+        const auto &fileList = vm["input-file"].as< std::vector<std::string> >();
 
-                avro::Reader reader(p);
-                
-                avro::header header = reader.readHeader();
+        FileEmitor emitor(fileList, limit, outDocument);
 
-                auto tsvFieldsList = reader.compileFieldsList(fields, header);
+        emitor.setFilter(filter);
+        emitor.setTsvFieldList(fields);
+        if (printProcessingFile) {
+            emitor.enablePrintProcessingFile();
+        }
+        std::vector<std::thread> workers;
 
-                if (!condition.empty()) {
-                    filter = filterCompiler.compile(condition);
-                }
+        for(u_int i = 0; i < jobs; ++i) { // TODO: check for inadequate values
+            workers.emplace_back(
+                    std::thread(Worker(emitor))
+                );
+        }
 
-                try {
-                    avro::BlockDecoder decoder(header, limiter);
-                    if (filter) {
-                        decoder.setFilter(std::unique_ptr<filter::Filter>(new filter::Filter(*filter)));
-                    }
-                    decoder.setTsvFilterExpression(tsvFieldsList);
-                    decoder.setDumpMethod(outDocument);
-                    
-                    std::vector<std::thread> workers;
-                    for(u_int i = 0; i < jobs; ++i) { // TODO: check for inadequate values
-                        workers.emplace_back(
-                            std::thread(
-                                std::bind(processFile, std::ref(decoder), std::ref(reader), std::ref(header))
-                            )
-                        );
-                    }
-                    for(auto &p : workers) {
-                        p.join();
-                    }
-                } catch (const avro::Eof &e) {
-                    ; // reading done
-                }
-                if (limiter.finished()) {
-                    break;
-                }
-            }
-        } catch (const avro::PathNotFound &e) {
-        	std::cerr << "can't locate path '" << e.getPath() << "'" << std::endl;
-        } catch (const std::runtime_error &e) {
-            std::cerr << e.what() << std::endl;
+        for(auto &p : workers) {
+            p.join();
         }
 
     } else {

@@ -29,6 +29,10 @@ endif()
 add_subdirectory (avro) 
 add_subdirectory (filter)
 
-add_executable(aq main.cc)
+add_executable(aq
+    main.cc
+    fileemitor.cc
+    worker.cc
+    )
 
 target_link_libraries (aq avro filter ${Boost_LIBRARIES} z)
