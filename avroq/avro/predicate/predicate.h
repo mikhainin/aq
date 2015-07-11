@@ -19,6 +19,7 @@ public:
     template <typename T>
     void apply(const T &sb);
 
+    void setIsNull(bool isNull);
 private:
     filter::equality_expression *expr;
 

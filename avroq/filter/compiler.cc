@@ -90,7 +90,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                 | bool_             [_val = _1 ]
                 | int_              [_val = _1 ]
                 | quoted_string     [_val = _1 ]
-                | lit("nil")        [_val = nil()];
+                | lit("nil")        [_val = filter::nil()];
 
             identifier =
                 lexeme[+char_("0-9a-zA-Z._")]

@@ -1,4 +1,5 @@
 
+#include "null.h"
 #include "union.h"
 
 
@@ -15,6 +16,15 @@ void Union::addChild(std::unique_ptr<Node> definition) {
 
 const std::vector<std::unique_ptr<Node> > &Union::getChildren() const {
     return children;    
+}
+
+bool Union::containsNull() const {
+    for(auto &p : children) {
+        if (p->is<node::Null>()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }

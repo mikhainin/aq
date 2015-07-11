@@ -99,6 +99,15 @@ void Predicate::applyNumeric(const T &i) {
 
 }
 
+void Predicate::setIsNull(bool isNull) {
+    if (expr->op == filter::equality_expression::IS_NIL) {
+        expr->setState(isNull);
+    } else if (expr->op == filter::equality_expression::NOT_NIL) {
+        expr->setState( ! isNull );
+    } else {
+        assert(false && "setIsNull: expr->op contains unknown operator");
+    }
+}
 
 }
 }

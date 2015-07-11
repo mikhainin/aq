@@ -99,7 +99,20 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
 
         if (filterNode->is<node::Union>()) {
             for( auto &p : filterNode->as<node::Union>().getChildren()) {
+                if (filterPredicate->op == filter::equality_expression::IS_NIL ||
+                    filterPredicate->op == filter::equality_expression::NOT_NIL
+                ) {
+                    if (!filterNode->as<node::Union>().containsNull()) {
+                        throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
+                    }
+
+                    // TODO lookup for index of NULL-node in the union
+
+                    break;
+                }
+
                 filterNode = p.get();
+
                 if (filterNode->is<node::Custom>()) {
                     filterNode = filterNode->as<node::Custom>().getDefinition().get();
                 }
@@ -114,8 +127,14 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                     break;
                 }
             }
+        } else {
+            if (filterPredicate->op == filter::equality_expression::IS_NIL ||
+                filterPredicate->op == filter::equality_expression::NOT_NIL
+            ) {
+                throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
+            }
         }
-        if (filterNode->isOneOf<node::String, node::Boolean>()) {
+        if (filterNode->isOneOf<node::String, node::Boolean, node::Union>()) {
             ; // ok
         } else if (filterNode->is<node::Enum>()) {
             auto const &e = filterNode->as<node::Enum>();
@@ -188,6 +207,20 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         int item = TypeParser<int>::read(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
         decodeDocument(stream, node);
+
+        if (filter) {
+            auto range = filterItems.equal_range(schema.get());
+            if (range.first != range.second) {
+                for_each (
+                    range.first,
+                    range.second,
+                    [&node](const auto& filterItem){
+                        filterItem.second->setIsNull(node->is<node::Null>());
+                    }
+                );
+            }
+        }
+
     } else if (schema->is<node::Custom>()) {
         decodeDocument(stream, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Enum>()) {

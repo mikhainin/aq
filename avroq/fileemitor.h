@@ -51,6 +51,7 @@ private:
     avro::Limiter limiter;
     std::shared_ptr<filter::Filter> filter;
     std::string tsvFieldList;
+    bool stop = false;
 
     bool canProduceNextTask();
 };

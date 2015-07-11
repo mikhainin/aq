@@ -1,8 +1,6 @@
 Ready to present:
 =================
 threading
-operators == nil, ~= nil
-validate if the field is nullable
 validate if the operation is viable for this field
 
 TODO

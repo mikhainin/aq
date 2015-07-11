@@ -14,6 +14,7 @@ public:
     void addChild(std::unique_ptr<Node> definition);
     const std::vector<std::unique_ptr<Node> > &getChildren() const;
 
+    bool containsNull() const;
 private:
     std::vector<std::unique_ptr<Node>> children;
 };

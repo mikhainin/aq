@@ -40,6 +40,11 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
     size_t &fileId) {
 
     std::lock_guard<std::mutex> lock(ownLock);
+    if (stop) {
+        return std::shared_ptr<Task>();
+    }
+
+    auto &currentFileName = fileList[currentFile];
 
     if (!currentTaskSample.reader || currentTaskSample.reader->eof()) {
 
@@ -47,13 +52,11 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
             return std::shared_ptr<Task>();
         }
 
-        auto &p = fileList[currentFile];
-
         if (printProcessingFile) {
-            std::cerr << "Processing " << p << std::endl;
+            std::cerr << "Processing " << currentFileName << std::endl;
         }
 
-        currentTaskSample.reader.reset(new avro::Reader(p));
+        currentTaskSample.reader.reset(new avro::Reader(currentFileName));
         currentTaskSample.header.reset(
                 new avro::header(currentTaskSample.reader->readHeader())
             );
@@ -85,11 +88,17 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 )
             );
         if (filter) {
-            decoder->setFilter(
-                    std::unique_ptr<filter::Filter>(
-                        new filter::Filter(*filter)
-                    )
-                );
+            try {
+                decoder->setFilter(
+                        std::unique_ptr<filter::Filter>(
+                            new filter::Filter(*filter)
+                        )
+                    );
+            } catch (const std::runtime_error &e) {
+                std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
+                    << e.what() << std::endl;
+                stop = true;
+            }
         }
         decoder->setTsvFilterExpression(*currentTaskSample.tsvFieldsList);
 

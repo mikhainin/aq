@@ -11,14 +11,22 @@ equality_expression::equality_expression(const std::string &ident) :
 }
 
 equality_expression& equality_expression::operator == (const type &constant) {
-    this->constant = constant;
-    op = EQ;
+    if (constant.type() == typeid(filter::nil)) {
+        op = IS_NIL;
+    } else {
+        this->constant = constant;
+        op = EQ;
+    }
     return *this;
 }
 
 equality_expression& equality_expression::operator != (const type &constant) {
-    this->constant = constant;
-    op = NE;
+    if (constant.type() == typeid(filter::nil)) {
+        op = NOT_NIL;
+    } else {
+        this->constant = constant;
+        op = NE;
+    }
     return *this;
 }
 
