@@ -26,60 +26,104 @@ BlockDecoder::BlockDecoder(const struct header &header, Limiter &limit) : header
 
 namespace {
 
-    struct ToDouble {
-        using result_type = double;
-        double operator() (double d) const {
-            return d;
-        }
-        double operator() (float f) const {
-            return f;
-        }
-        double operator() (int i) const {
-            return i;
+    struct TypeName {
+        TypeName(const std::string &name)
+            : name(name) {
         }
 
-        template <typename T>
-        double operator() (const T&) const {
-            throw std::runtime_error("wrong type");
+        std::string name;
+    };
+
+    template <typename T>
+    struct ThowTypeName {
+        using result_type = T;
+
+        T operator() (double) const {
+            throw TypeName("double");
+        }
+        T operator() (float) const {
+            throw TypeName("float");
+        }
+        T operator() (int) const {
+            throw TypeName("int");
+        }
+        T operator() (const std::string &) const {
+            throw TypeName("string");
+        }
+
+        T operator() (bool) const {
+            throw TypeName("bool");
+        }
+        template <typename AgrgType>
+        T operator() (const AgrgType&) const {
+            throw TypeName(std::string("Unknown type:") + typeid(AgrgType).name());
         }
     };
 
+    template <>
+    double ThowTypeName<double>::operator() (double d) const {
+        return d;
+    }
+    template <>
+    double ThowTypeName<double>::operator() (float f) const {
+        return f;
+    }
+    template <>
+    double ThowTypeName<double>::operator() (int i) const {
+        return i;
+    }
 
-    struct ToFloat {
-        using result_type = float;
-        float operator() (double d) const {
-            return d;
-        }
-        float operator() (float f) const {
-            return f;
-        }
-        float operator() (int i) const {
-            return i;
-        }
 
-        template <typename T>
-        float operator() (const T&) const {
-            throw std::runtime_error("wrong type");
-        }
-    };
+    using ToDouble = ThowTypeName<double>;
 
-    struct ToInt {
-        using result_type = int;
-        int operator() (double d) const {
-            return d;
-        }
-        int operator() (float f) const {
-            return f;
-        }
-        int operator() (int i) const {
-            return i;
-        }
 
-        template <typename T>
-        float operator() (const T&) const {
-            throw std::runtime_error("wrong type");
-        }
-    };
+    template <>
+    float ThowTypeName<float>::operator() (double d) const {
+        return d;
+    }
+    template <>
+    float ThowTypeName<float>::operator() (float f) const {
+        return f;
+    }
+    template <>
+    float ThowTypeName<float>::operator() (int i) const {
+        return i;
+    }
+
+    using ToFloat = ThowTypeName<float>;
+
+
+    template <>
+    int ThowTypeName<int>::operator() (double d) const {
+        return d;
+    }
+    template <>
+    int ThowTypeName<int>::operator() (float f) const {
+        return f;
+    }
+    template <>
+    int ThowTypeName<int>::operator() (int i) const {
+        return i;
+    }
+
+    using ToInt = ThowTypeName<int>;
+
+
+    template <>
+    std::string ThowTypeName<std::string>::operator() (const std::string &s) const {
+        return s;
+    }
+
+    using ToString = ThowTypeName<std::string>;
+
+
+    template <>
+    bool ThowTypeName<bool>::operator() (bool b) const {
+        return b;
+    }
+
+    using ToBoolean = ThowTypeName<bool>;
+
 
 }
 
@@ -134,8 +178,12 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                 throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
             }
         }
-        if (filterNode->isOneOf<node::String, node::Boolean, node::Union>()) {
-            ; // ok
+        if (filterNode->isOneOf<node::Union>()) {
+            ; // ok, acceptable only for isnil/notnil operations
+        } else if (filterNode->is<node::String>()) {
+            filterPredicate->constant = convertFilterConstant<ToString>(filterPredicate, filterNode);
+        } else if (filterNode->is<node::Boolean>()) {
+            filterPredicate->constant = convertFilterConstant<ToBoolean>(filterPredicate, filterNode);
         } else if (filterNode->is<node::Enum>()) {
             auto const &e = filterNode->as<node::Enum>();
             int i = e.findIndexForValue(boost::get<std::string>(filterPredicate->constant));
@@ -145,11 +193,11 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
             }
             filterPredicate->constant = i;
         } else if (filterNode->is<node::Double>()) {
-            filterPredicate->constant = boost::apply_visitor(ToDouble(), filterPredicate->constant);
+            filterPredicate->constant = convertFilterConstant<ToDouble>(filterPredicate, filterNode);
         } else if (filterNode->is<node::Float>()) {
-            filterPredicate->constant = boost::apply_visitor(ToFloat(), filterPredicate->constant);
+            filterPredicate->constant = convertFilterConstant<ToFloat>(filterPredicate, filterNode);
         } else if (filterNode->isOneOf<node::Int, node::Long>()) {
-            filterPredicate->constant = boost::apply_visitor(ToInt(), filterPredicate->constant);
+            filterPredicate->constant = convertFilterConstant<ToInt>(filterPredicate, filterNode);
         } else {
             throw std::runtime_error(
                 "Sorry, but type '" + filterNode->getTypeName() +
@@ -164,6 +212,18 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
             );
     }
 }
+
+template <typename T>
+typename T::result_type BlockDecoder::convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const {
+    try {
+        return boost::apply_visitor(T(), expr->constant);
+    } catch(const TypeName &e) {
+        throw std::runtime_error("Invalid type for field '" + expr->identifier + "'"
+            + " expected: " + filterNode->getTypeName() + ", got: " +
+            e.name);
+    }
+}
+
 
 
 void BlockDecoder::decodeAndDumpBlock(Block &block) {

@@ -1,7 +1,6 @@
 Ready to present:
 =================
 threading
-validate if the operation is viable for this field
 
 TODO
 ====

@@ -7,7 +7,8 @@
 #include "dumper/tsvexpression.h"
 
 namespace filter {
-  class Filter;
+    class Filter;
+    struct equality_expression;
 }
 namespace avro {
 
@@ -49,7 +50,10 @@ private:
 
     template <typename T>
     void skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
-    
+
+    template <typename T>
+    typename T::result_type convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const;
+
     const node::Node* schemaNodeByPath(const std::string &path);
 };
 
