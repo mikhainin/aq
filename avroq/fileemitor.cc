@@ -100,7 +100,7 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 stop = true;
             }
         }
-        decoder->setTsvFilterExpression(*currentTaskSample.tsvFieldsList);
+        decoder->setTsvFilterExpression(*task->tsvFieldsList);
 
         decoder->setDumpMethod(outDocument);
 

@@ -24,7 +24,6 @@ namespace filter {
 struct Task {
     std::shared_ptr<avro::Reader> reader;
     std::shared_ptr<avro::header> header;
-    std::shared_ptr<avro::BlockDecoder> decoder;
     std::shared_ptr<avro::StringBuffer> buffer;
     std::shared_ptr<avro::dumper::TsvExpression> tsvFieldsList;
     int64_t objectCount;
