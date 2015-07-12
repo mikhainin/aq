@@ -33,6 +33,8 @@ public:
     void setFilter(std::unique_ptr<filter::Filter> flt);
     void setTsvFilterExpression(const dumper::TsvExpression &tsvFieldsList);
     void setDumpMethod(std::function<void(const std::string &)> dumpMethod);
+    void setCountMethod(std::function<void(size_t)> coutMethod);
+    void enableCountOnlyMode();
 
 private:
     const struct header &header;
@@ -41,9 +43,12 @@ private:
     std::unique_ptr<filter::Filter> filter;
     std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>> filterItems;
     std::function<void(const std::string &)> dumpMethod;
-
+    std::function<void(size_t)> coutMethod;
+    bool countOnly = false;
 
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
+
+    void dumpDocument(Block &block);
 
     template <class T>
     void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema, T &dumper);

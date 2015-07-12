@@ -30,7 +30,6 @@ void Worker::operator()() {
             break;
         }
 
-
         auto &buffer = *task->buffer;
 
         block.buffer.assignData(buffer.data(), buffer.size());

@@ -33,6 +33,7 @@ int main(int argc, const char * argv[]) {
     u_int jobs = 4;
     std::string fields;
     bool printProcessingFile = false;
+    bool countMode = false;
 
     po::options_description desc("Allowed options");
     desc.add_options()
@@ -43,6 +44,7 @@ int main(int argc, const char * argv[]) {
         ("fields,l", po::value< std::string >(&fields), "fields to output")
         ("print-file", po::bool_switch(&printProcessingFile), "Print name of processing file")
         ("jobs,j", po::value< u_int >(&jobs), "Number of threads to run")
+        ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
     ;
     po::positional_options_description p;
     p.add("input-file", -1);
@@ -81,6 +83,9 @@ int main(int argc, const char * argv[]) {
         if (printProcessingFile) {
             emitor.enablePrintProcessingFile();
         }
+        if (countMode) {
+            emitor.enableCountOnlyMode();
+        }
         std::vector<std::thread> workers;
 
         for(u_int i = 0; i < jobs; ++i) { // TODO: check for inadequate values
@@ -91,6 +96,9 @@ int main(int argc, const char * argv[]) {
 
         for(auto &p : workers) {
             p.join();
+        }
+        if (countMode) {
+            std::cout << "Matched documents: " << emitor.getCountedDocuments() << std::endl;
         }
 
     } else {

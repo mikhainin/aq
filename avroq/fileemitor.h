@@ -36,10 +36,12 @@ public:
 
     std::shared_ptr<Task> getNextTask(std::unique_ptr<avro::BlockDecoder> &decoder, size_t &fileId);
 
-    void enablePrintProcessingFile(); // TODO: use me
-    void setFilter(std::shared_ptr<filter::Filter> filter); // TODO: use me
-    void setTsvFieldList(const std::string &tsvFieldList); // TODO: use me
+    void enablePrintProcessingFile();
+    void enableCountOnlyMode();
+    void setFilter(std::shared_ptr<filter::Filter> filter);
+    void setTsvFieldList(const std::string &tsvFieldList);
 
+    size_t getCountedDocuments() const;
 private:
     const std::vector<std::string> &fileList;
     bool printProcessingFile = false;
@@ -50,9 +52,13 @@ private:
     avro::Limiter limiter;
     std::shared_ptr<filter::Filter> filter;
     std::string tsvFieldList;
+    std::atomic_size_t countedDocuments;
     bool stop = false;
+    bool countMode = false;
 
     bool canProduceNextTask();
+
+    void countDocument(size_t num);
 };
 
 #endif

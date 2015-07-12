@@ -73,7 +73,6 @@ namespace {
         return i;
     }
 
-
     using ToDouble = ThowTypeName<double>;
 
 
@@ -127,14 +126,6 @@ namespace {
 
 }
 
-void BlockDecoder::setTsvFilterExpression(const dumper::TsvExpression &tsvFieldsList) {
-    this->tsvFieldsList = tsvFieldsList;
-}
-
-void BlockDecoder::setDumpMethod(std::function<void(const std::string &)> dumpMethod) {
-    this->dumpMethod = dumpMethod;
-}
-
 void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
     filter = std::move(flt);
 
@@ -180,10 +171,6 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
         }
         if (filterNode->isOneOf<node::Union>()) {
             ; // ok, acceptable only for isnil/notnil operations
-        } else if (filterNode->is<node::String>()) {
-            filterPredicate->constant = convertFilterConstant<ToString>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Boolean>()) {
-            filterPredicate->constant = convertFilterConstant<ToBoolean>(filterPredicate, filterNode);
         } else if (filterNode->is<node::Enum>()) {
             auto const &e = filterNode->as<node::Enum>();
             int i = e.findIndexForValue(boost::get<std::string>(filterPredicate->constant));
@@ -192,6 +179,10 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                 throw std::runtime_error("Invalid value for enum field '" + filterPredicate->identifier + "'");
             }
             filterPredicate->constant = i;
+        } else if (filterNode->is<node::String>()) {
+            filterPredicate->constant = convertFilterConstant<ToString>(filterPredicate, filterNode);
+        } else if (filterNode->is<node::Boolean>()) {
+            filterPredicate->constant = convertFilterConstant<ToBoolean>(filterPredicate, filterNode);
         } else if (filterNode->is<node::Double>()) {
             filterPredicate->constant = convertFilterConstant<ToDouble>(filterPredicate, filterNode);
         } else if (filterNode->is<node::Float>()) {
@@ -224,9 +215,29 @@ typename T::result_type BlockDecoder::convertFilterConstant(const filter::equali
     }
 }
 
+void BlockDecoder::setTsvFilterExpression(const dumper::TsvExpression &tsvFieldsList) {
+    this->tsvFieldsList = tsvFieldsList;
+}
 
+void BlockDecoder::setDumpMethod(std::function<void(const std::string &)> dumpMethod) {
+    this->dumpMethod = dumpMethod;
+}
+
+void BlockDecoder::setCountMethod(std::function<void(size_t)> coutMethod) {
+    this->coutMethod = coutMethod;
+}
+
+void BlockDecoder::enableCountOnlyMode() {
+    countOnly = true;
+}
 
 void BlockDecoder::decodeAndDumpBlock(Block &block) {
+
+    if (countOnly && !filter) {
+        // TODO: count without decompression
+        coutMethod(block.objectCount);
+        return;
+    }
 
     for(int i = 0; i < block.objectCount; ++i) {
         // TODO: rewrite it using hierarcy of filters/decoders.
@@ -238,16 +249,9 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         decodeDocument(block.buffer, header.schema);
 
         if (!filter || filter->expressionPassed()) {
-            block.buffer.resetToDocument();
-            if (tsvFieldsList.pos > 0) {
-                dumper::Tsv dumper(tsvFieldsList);
-                dumpDocument(block.buffer, header.schema, dumper);
-                dumper.EndDocument(dumpMethod);
-            } else {
-                dumper::Fool dumper;
-                dumpDocument(block.buffer, header.schema, dumper);
-                dumper.EndDocument(dumpMethod);
-            }
+
+            dumpDocument(block);
+
             limit.documentFinished();
             if(filter) {
                 filter->resetState();
@@ -255,6 +259,23 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         }
     }
 
+}
+
+void BlockDecoder::dumpDocument(Block &block) {
+    if (countOnly) {
+        coutMethod(1);
+        return;
+    }
+    block.buffer.resetToDocument();
+    if (tsvFieldsList.pos > 0) {
+        dumper::Tsv dumper(tsvFieldsList);
+        dumpDocument(block.buffer, header.schema, dumper);
+        dumper.EndDocument(dumpMethod);
+    } else {
+        dumper::Fool dumper;
+        dumpDocument(block.buffer, header.schema, dumper);
+        dumper.EndDocument(dumpMethod);
+    }
 }
 
 
@@ -403,22 +424,16 @@ void BlockDecoder::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<no
         } else if (schema->is<node::Long>()) {
             long value = readZigZagLong(stream);
             dumper.Long(value, schema->as<node::Long>());
-            // std::cout << schema->getItemName() << ": " << value << std::endl;
         } else if (schema->is<node::Float>()) {
-            // readFloat(stream);
-            // std::cout << schema->getItemName() << ": " << readFloat(stream) << std::endl;
             float value = TypeParser<float>::read(stream);
             dumper.Float(value, schema->as<node::Float>());
         } else if (schema->is<node::Double>()) {
-            // std::cout << schema->getItemName() << ": " << readDouble(stream) << std::endl;
             double value =  TypeParser<double>::read(stream);
             dumper.Double(value, schema->as<node::Double>());
         } else if (schema->is<node::Boolean>()) {
-            // std::cout << schema->getItemName() << ": " << readBoolean(stream) << std::endl;
             bool value = TypeParser<bool>::read(stream);
             dumper.Boolean(value, schema->as<node::Boolean>());
         } else if (schema->is<node::Null>()) {
-            // std::cout << schema->getItemName() << ": null" << std::endl;
             dumper.Null(schema->as<node::Null>());
         } else {
             std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;

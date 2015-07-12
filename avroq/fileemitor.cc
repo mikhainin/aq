@@ -1,6 +1,9 @@
+#include <functional>
 #include <iostream>
 #include <thread>
 #include <mutex>
+
+#include <boost/lambda/lambda.hpp>
 
 #include <avro/node/all_nodes.h>
 #include <avro/blockdecoder.h>
@@ -18,12 +21,17 @@ FileEmitor::FileEmitor( const std::vector<std::string> &fileList,
                         std::function<void(const std::string&)> outDocument) :
     fileList(fileList),
     outDocument(outDocument),
-    limiter(limit) {
+    limiter(limit),
+    countedDocuments(0) {
 
 }
 
 void FileEmitor::enablePrintProcessingFile() {
     printProcessingFile = true;
+}
+
+void FileEmitor::enableCountOnlyMode() {
+    countMode = true;
 }
 
 void FileEmitor::setFilter(std::shared_ptr<filter::Filter> filter) {
@@ -104,6 +112,14 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
 
         decoder->setDumpMethod(outDocument);
 
+        if (countMode) {
+            using namespace std::placeholders;
+            decoder->setCountMethod(
+                std::bind(&FileEmitor::countDocument, this, _1)
+                // countedDocuments += boost::lambda::_1
+            );
+            decoder->enableCountOnlyMode();
+        }
     }
 
     task->buffer.reset(new avro::StringBuffer(
@@ -116,3 +132,10 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
     return task;
 }
 
+void FileEmitor::countDocument(size_t num) {
+    (void)countedDocuments.fetch_add(num);
+}
+
+size_t FileEmitor::getCountedDocuments() const {
+    return countedDocuments;
+}
