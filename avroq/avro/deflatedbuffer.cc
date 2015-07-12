@@ -93,15 +93,6 @@ void DeflatedBuffer::resetToDocument() {
     pointer = documentStartPointer;
 }
 
-std::string DeflatedBuffer::getStdString(size_t len) {
-    std::string result;
-    result.resize(len);
-
-    read((void*)result.data(), len);
-
-    return result;
-}
-
 StringBuffer DeflatedBuffer::getString(size_t len) {
     StringBuffer result((const char*)buf.data() + pointer, len);
     pointer += len;
