@@ -40,4 +40,9 @@ void StringBuffer::read(void *to, size_t len) {
     pointer += len;
 
 }
+
+const char *StringBuffer::data() const {
+    return c;
+}
+
 }

@@ -19,11 +19,13 @@ namespace filter {
             GT,
             LE,
             GE,
-            STRING
+            STRING,
+            IS_NIL,
+            NOT_NIL
         };
         typedef
             boost::variant<
-                nil
+                filter::nil
               , int
               , bool
               , double

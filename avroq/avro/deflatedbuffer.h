@@ -12,7 +12,7 @@ class DeflatedBuffer {
 public:
     DeflatedBuffer();
 
-    void assignData(const char *compressedData, size_t length);
+    void assignData(const StringBuffer &b);
 
     char getChar();
     StringBuffer getStringBuffer(size_t length);
@@ -40,11 +40,10 @@ public:
 
     void resetToDocument();
     
-    std::string getStdString(size_t len);
     StringBuffer getString(size_t len);
 
 private:
-    std::vector<uint8_t> buf;
+    const char *c = nullptr;
     size_t length = 0;
     size_t pointer = 0;
 

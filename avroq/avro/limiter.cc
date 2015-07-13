@@ -1,4 +1,6 @@
 #include <limits>
+#include <thread>
+#include <iostream>
 
 #include "finished.h"
 #include "limiter.h"
@@ -12,10 +14,13 @@ Limiter::Limiter(int limit) : limit(limit) {
 }
 
 void Limiter::documentFinished() {
-    --limit;
-    if (limit <= 0) {
+    if (limit.fetch_sub(1) <= 0) {
         throw Finished();
     }
+}
+
+bool Limiter::finished() const {
+    return limit <= 0;
 }
 
 

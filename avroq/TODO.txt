@@ -1,23 +1,20 @@
 Ready to present:
 =================
 threading
-operators == nil, ~= nil
-validate if the field is nullable
-validate if the operation is viable for this field
-throw error when unable to compile condition
 
 TODO
 ====
 print names/values in columns (to be able to copy field names)
 print as json
 sort fields on output
-count matched records
 configurable [CT]SV separator char
 configurable null value representation in output
 check condition after last used schema node
 records separator via command-line argument
 tail mode
 progressbar
+output in avro format
+
 
 Long term TODO
 ==============

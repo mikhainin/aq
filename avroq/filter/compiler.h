@@ -10,7 +10,13 @@ class Filter;
 
 class Compiler {
 public:
-
+    class CompileError {
+    public:
+        CompileError(const std::string &rest);
+        std::string what() const;
+    private:
+        std::string rest;
+    };
     std::shared_ptr<Filter> compile(const std::string &str);
 
 };

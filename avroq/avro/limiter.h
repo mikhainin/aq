@@ -1,13 +1,7 @@
-//
-//  limiter.h
-//  avroq
-//
-//  Created by Mikhail Galanin on 12/04/15.
-//  Copyright (c) 2015 Mikhail Galanin. All rights reserved.
-//
-
 #ifndef __avroq__limiter__
 #define __avroq__limiter__
+
+#include <atomic>
 
 namespace avro {
 
@@ -15,8 +9,9 @@ class Limiter {
 public:
     explicit Limiter(int limit);
     void documentFinished();
+    bool finished() const;
 private:
-    int limit;
+    std::atomic_int limit;
 };
 
 }

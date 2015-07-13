@@ -108,6 +108,11 @@ Filter::Filter(const detail::expression_ast &ast) : ast(ast) {
     extractor(this->ast);
 }
 
+Filter::Filter(const Filter& oldFilter) : ast(oldFilter.ast) {
+    ExpressionExtractor extractor(*this);
+    extractor(this->ast);
+}
+
 bool Filter::expressionPassed() const {
     AstRunner runner;
     return runner(ast);

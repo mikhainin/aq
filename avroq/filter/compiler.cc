@@ -90,7 +90,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                 | bool_             [_val = _1 ]
                 | int_              [_val = _1 ]
                 | quoted_string     [_val = _1 ]
-                | lit("nil")        [_val = nil()];
+                | lit("nil")        [_val = filter::nil()];
 
             identifier =
                 lexeme[+char_("0-9a-zA-Z._")]
@@ -147,6 +147,13 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
 
 }
 
+Compiler::CompileError::CompileError(const std::string &rest)
+    : rest(rest) {
+}
+
+std::string Compiler::CompileError::what() const {
+    return "stopped at: \": " + rest + "\"\n";
+}
 
 std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
     using boost::spirit::ascii::space;
@@ -171,10 +178,7 @@ std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
     else
     {
         std::string rest(iter, end);
-        std::cout << "-------------------------\n";
-        std::cout << "Parsing failed\n";
-        std::cout << "stopped at: \": " << rest << "\"\n";
-        std::cout << "-------------------------\n";
+        throw CompileError(rest);
     }
     return std::make_shared<Filter>(ast);
 }
