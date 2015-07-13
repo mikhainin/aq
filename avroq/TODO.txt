@@ -1,7 +1,3 @@
-Ready to present:
-=================
-threading
-
 TODO
 ====
 print names/values in columns (to be able to copy field names)
@@ -13,7 +9,6 @@ check condition after last used schema node
 records separator via command-line argument
 tail mode
 progressbar
-output in avro format
 
 
 Long term TODO
@@ -21,7 +16,6 @@ Long term TODO
 query JSON
 query protobuf
 print protobuf content
-count total number of records
 display ad JSON
 select fields to print (for non-TSV output)
 AVRO as output format

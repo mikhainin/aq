@@ -1,11 +1,8 @@
-#include <zlib.h>
-#include <assert.h>
-#include <string.h>
-
-#include <algorithm>
+#include <cstring>
 #include <stdexcept>
 
 #include "deflatedbuffer.h"
+
 namespace avro {
 
 DeflatedBuffer::DeflatedBuffer() {
@@ -24,7 +21,7 @@ char DeflatedBuffer::getChar() {
 }
 
 void DeflatedBuffer::read(void *to, size_t len) {
-    memcpy(to, c + pointer, len);
+    std::memcpy(to, c + pointer, len);
     pointer += len;
 }
 

@@ -36,7 +36,7 @@ private:
     Private *d = nullptr;
 
 
-    void dumpShema(const std::unique_ptr<node::Node> &schema, int level = 0) const;
+    void dumpSchema(const std::unique_ptr<node::Node> &schema, int level = 0) const;
 
     const node::Node* schemaNodeByPath(const std::string &path, const header &header);
 

@@ -73,7 +73,7 @@ header Reader::readHeader() {
     SchemaReader schemaReader(header.metadata["avro.schema"]);
     header.schema = schemaReader.parse();
     header.nodesNumber = schemaReader.nodesNumber();
-    //dumpShema(schemaRoot);
+    //dumpSchema(schemaRoot);
     
     char c = d->input->getChar();
 
@@ -108,14 +108,14 @@ bool Reader::eof() {
 }
 
 
-void Reader::dumpShema(const std::unique_ptr<node::Node> &schema, int level) const {
+void Reader::dumpSchema(const std::unique_ptr<node::Node> &schema, int level) const {
     if (schema->is<node::Record>()) {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
         }
         std::cout << schema->getItemName() << " {\n";
         for(auto &p : schema->as<node::Record>().getChildren()) {
-            dumpShema(p, level + 1);
+            dumpSchema(p, level + 1);
         }
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -127,7 +127,7 @@ void Reader::dumpShema(const std::unique_ptr<node::Node> &schema, int level) con
         }
         std::cout << schema->getItemName() << ":[\n";
         for(auto &p : schema->as<node::Union>().getChildren()) {
-            dumpShema(p, level + 1);
+            dumpSchema(p, level + 1);
         }
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
@@ -138,7 +138,7 @@ void Reader::dumpShema(const std::unique_ptr<node::Node> &schema, int level) con
             std::cout << "\t";
         }
         std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
-        dumpShema(schema->as<node::Custom>().getDefinition(), level + 1);
+        dumpSchema(schema->as<node::Custom>().getDefinition(), level + 1);
     } else {
         for(int i = 0; i < level; ++i) {
             std::cout << "\t";
