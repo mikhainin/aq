@@ -2,7 +2,7 @@
 #include "node.h"
 
 namespace avro {
-
+namespace node {
 
 
 Node::Node(int number, const std::string& typeName, const std::string &itemName)
@@ -26,4 +26,5 @@ int Node::getNumber() const {
     return number;
 }
 
+}
 }

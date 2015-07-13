@@ -15,6 +15,9 @@ public:
     explicit Enum(int number, const std::string &name);
     void addValue(const std::string &value);
     const std::string &operator[](int i) const;
+
+    // -1 if not found
+    int findIndexForValue(const std::string &value) const;
 private:
     std::vector<std::string> values;
 };

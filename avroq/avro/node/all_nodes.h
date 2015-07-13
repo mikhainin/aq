@@ -1,0 +1,16 @@
+#pragma once
+
+#include "node.h"
+#include "record.h"
+#include "union.h"
+#include "string.h"
+#include "custom.h"
+#include "int.h"
+#include "long.h"
+#include "array.h"
+#include "boolean.h"
+#include "enum.h"
+#include "float.h"
+#include "double.h"
+#include "map.h"
+#include "null.h"

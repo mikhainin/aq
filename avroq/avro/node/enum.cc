@@ -19,5 +19,14 @@ const std::string &Enum::operator[](int i) const {
     return values[i];
 }
 
+int Enum::findIndexForValue(const std::string &value) const {
+    for(size_t i = 0; i < values.size(); ++i) {
+        if (values[i] == value) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 }
 }

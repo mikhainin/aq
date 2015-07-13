@@ -17,9 +17,13 @@ add_library(avro
                  node/long.cc
                  node/map.cc
                  node/node.cc
+                 node/nodebypath.cc
                  node/null.cc
                  node/record.cc
                  node/string.cc
                  node/union.cc
- )
+
+ # TODO: move to subfolder
+                 predicate/predicate.cc
+)
 

@@ -4,10 +4,16 @@
 
 #include <string>
 #include <memory>
+#include <stdexcept>
 
 #include "stringbuffer.h"
 
 namespace avro {
+
+class FileException : public std::runtime_error {
+public:
+    FileException(const std::string &msg);
+};
 
 class FileHandle {
 public:

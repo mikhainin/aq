@@ -1,11 +1,3 @@
-//
-//  deflatedbuffer.h
-//  avroq
-//
-//  Created by Mikhail Galanin on 06/04/15.
-//  Copyright (c) 2015 Mikhail Galanin. All rights reserved.
-//
-
 #ifndef __avroq__deflatedbuffer__
 #define __avroq__deflatedbuffer__
 

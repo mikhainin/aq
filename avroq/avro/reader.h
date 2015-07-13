@@ -15,37 +15,29 @@
 
 #include <boost/iostreams/filtering_stream.hpp>
 
-namespace avro {
+#include "stringbuffer.h"
+#include "dumper/tsvexpression.h"
 
-class Node;
+namespace filter {
+    class Filter;
+}
+
+namespace avro {
+namespace node {
+    class Node;
+}
+
+struct Block;
 class DeflatedBuffer;
 class Limiter;
 
 struct header {
     std::map<std::string, std::string> metadata;
-    std::unique_ptr<Node> schema;
+    std::unique_ptr<node::Node> schema;
     int nodesNumber = 0;
     char sync[16] = {0}; // TODO sync length to a constant
 };
 
-struct FilterExpression {
-    std::string what;
-    const Node *shemaItem;
-    union {
-        long i;
-        // std::string s;
-        float f;
-        double d;
-        bool b;
-    } value;
-    std::string strValue;
-};
-
-
-struct TsvExpression {
-	std::map<int, int> what;
-	int pos = 0;
-};
 
 class Reader {
 public:
@@ -70,10 +62,14 @@ public:
 
     header readHeader();
 
-    void readBlock(const header &header, const FilterExpression *filter, const TsvExpression &wd);
+    std::unique_ptr<Block> nextBlock(const header &header);
 
-    FilterExpression compileCondition(const std::string &what, const std::string &condition, const header &header);
-    TsvExpression compileFieldsList(const std::string &filedList, const header &header);
+
+    void readBlock(const header &header, const dumper::TsvExpression &wd);
+
+    dumper::TsvExpression compileFieldsList(const std::string &filedList, const header &header);
+
+    void setFilter(std::shared_ptr<filter::Filter> filter, const header &header);
 
     bool eof();
 private:
@@ -81,21 +77,29 @@ private:
     class Private;
     Private *d = nullptr;
 
-    // int64_t readLong(std::istream &input);
+    template <typename T>
+    T read(DeflatedBuffer &input);
+
+    template <typename T>
+    void skip(DeflatedBuffer &input);
+
     std::string readString(DeflatedBuffer &input);
-    float readFloat(DeflatedBuffer &input);
-    double readDouble(DeflatedBuffer &input);
-    bool readBoolean(DeflatedBuffer &input);
+    StringBuffer readStringBuffer(DeflatedBuffer &input);
+    void skipString(DeflatedBuffer &input);
+    void skipInt(DeflatedBuffer &input);
 
-    void dumpShema(const std::unique_ptr<Node> &schema, int level = 0) const;
-    void decodeBlock(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, const FilterExpression *filter);
+    void dumpShema(const std::unique_ptr<node::Node> &schema, int level = 0) const;
+    void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 
-    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
+    //void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, int level);
 
     template <class T>
-    void writeDocument(DeflatedBuffer &stream, const std::unique_ptr<Node> &schema, T &dumper);
+    void dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema, T &dumper);
 
-    const Node* schemaNodeByPath(const std::string &path, const header &header);
+    const node::Node* schemaNodeByPath(const std::string &path, const header &header);
+
+    template <class T>
+    void skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 };
 
 }

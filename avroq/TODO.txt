@@ -1,15 +1,10 @@
 Ready to present:
 =================
 threading
-operators <, > for integers
-operators <, > for doubles
-operators <, > for floats
-operators starts_with, ends_with, contains for strings
 operators == nil, ~= nil
 validate if the field is nullable
 validate if the operation is viable for this field
-operator ==, ~= for enums
-operator ==, ~= for bools
+throw error when unable to compile condition
 
 TODO
 ====
@@ -17,10 +12,12 @@ print names/values in columns (to be able to copy field names)
 print as json
 sort fields on output
 count matched records
-bug: correctly process unexisted file (without Assertion `fd > 0' failed.)
 configurable [CT]SV separator char
 configurable null value representation in output
-NULL compression codec support
+check condition after last used schema node
+records separator via command-line argument
+tail mode
+progressbar
 
 Long term TODO
 ==============

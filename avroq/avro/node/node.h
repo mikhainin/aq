@@ -3,8 +3,10 @@
 
 #include <string>
 #include <memory>
+#include <type_traits>
 
 namespace avro {
+namespace node {
 
 class Node {
 public:
@@ -14,6 +16,19 @@ public:
     template<class T>
     inline bool is() const {
         return dynamic_cast<const T*>(this) != nullptr;
+    }
+
+    template<class T>
+    inline bool isOneOf() const {
+        return is<T>();
+    }
+
+
+    template<class T, class... Args>
+    auto isOneOf() const ->
+         typename std::enable_if< (0 < sizeof...(Args)), bool>::type
+    {
+        return is<T>() || isOneOf<Args...>();
     }
 
     template<class T>
@@ -31,7 +46,6 @@ public:
     const std::string &getItemName() const;
 
     int getNumber() const;
-    //virtual void dump(std::function<void(std::string)> &dumper) = 0;
 
 private:
     int number;
@@ -40,6 +54,6 @@ private:
 };
 
 }
-
+}
 
 #endif /* AVROQ_AVRO_SCHEMANODE_H_ */

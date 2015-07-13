@@ -10,9 +10,11 @@
 #include <boost/spirit/include/phoenix_function.hpp>
 
 #include "detail/ast.hpp"
-
-#include "filter.h"
 #include "compiler.h"
+#include "equality_expression.h"
+#include "filter.h"
+#include "string_operator.h"
+
 namespace filter {
 
 namespace client
@@ -29,13 +31,14 @@ namespace client
 
         void operator()(qi::info::nil) const {}
         void operator()(int n) const { std::cout << n; }
+        void operator()(bool b) const { std::cout << (b ? "true" : "false"); }
         void operator()(const std::string &s) const { std::cout << s; }
-        void operator()(const detail::equality_expression &s) const {
+        void operator()(const equality_expression &s) const {
             std::cout << s.identifier << (s.op == s.EQ ? "==" : "!=");
             this->operator()(s.constant);
         }
 
-        void operator()(const detail::nil &) const { std::cout << "/nil/"; }
+        void operator()(const nil &) const { std::cout << "/nil/"; }
 
         void operator()(detail::expression_ast const& ast) const
         {
@@ -69,6 +72,8 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             using qi::_val;
             using qi::_1;
             using qi::int_;
+            using qi::bool_;
+            using qi::double_;
             using qi::string;
             using qi::lexeme;
             using qi::lit;
@@ -81,20 +86,38 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                 ;
 
             constant =
-                  int_              [_val = _1 ]
+                  double_           [_val = _1 ]
+                | bool_             [_val = _1 ]
+                | int_              [_val = _1 ]
                 | quoted_string     [_val = _1 ]
-                | lit("nil")        [_val = detail::nil()];
+                | lit("nil")        [_val = nil()];
 
             identifier =
-                lexeme[+char_("0-9a-zA-Z.")]
+                lexeme[+char_("0-9a-zA-Z._")]
                 ;
 
 
             equality_expr =
-                identifier                  [_val = _1]
+                identifier                  [_val =  _1]
                     >>  ( ("==" >> constant [_val == _1])
                         | ("~=" >> constant [_val != _1])
+                        | ("<"  >> constant [_val <  _1])
+                        | (">"  >> constant [_val >  _1])
+                        | ("<=" >> constant [_val <= _1])
+                        | ("=>" >> constant [_val >= _1])
                         )
+                    |
+
+                identifier                       [_val = _1]
+                    >> (
+                            (
+                                lit(":contains(")      [_val |= string_operator(string_operator::CONTAINS)]
+                                | lit(":starts_with(") [_val |= string_operator(string_operator::STARTS_WITH)]
+                                | lit(":ends_with(")   [_val |= string_operator(string_operator::ENDS_WITH)]
+                            )
+                         >> quoted_string        [_val |= _1]
+                         >> ')'
+                       )
                 ;
 
             braces_expr =
@@ -116,8 +139,8 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
         qi::rule<Iterator, detail::expression_ast(), ascii::space_type>
         logical_expression, condition, braces_expr;
 
-        qi::rule<Iterator, detail::equality_expression::type(), ascii::space_type> constant;
-        qi::rule<Iterator, detail::equality_expression(), ascii::space_type> equality_expr;
+        qi::rule<Iterator, equality_expression::type(), ascii::space_type> constant;
+        qi::rule<Iterator, equality_expression(), ascii::space_type> equality_expr;
         qi::rule<Iterator, std::string(), ascii::space_type> quoted_string;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
     };
@@ -133,17 +156,17 @@ std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
 
     std::string::const_iterator iter = str.begin();
     std::string::const_iterator end = str.end();
-    std::shared_ptr<detail::expression_ast> ast = std::make_shared<detail::expression_ast>();
+    detail::expression_ast ast; // = std::make_shared<detail::expression_ast>();
     // ast_print printer;
     calculator calc; // Our grammar
-    bool r = phrase_parse(iter, end, calc, space, *ast);
+    bool r = phrase_parse(iter, end, calc, space, ast);
 
     if (r && iter == end)
     {
-        std::cout << "-------------------------\n";
-        std::cout << "Parsing succeeded\n";
+        // std::cout << "-------------------------\n";
+        // std::cout << "Parsing succeeded\n";
         // printer(ast);
-        std::cout << "\n-------------------------\n";
+        // std::cout << "\n-------------------------\n";
     }
     else
     {
