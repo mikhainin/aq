@@ -41,7 +41,7 @@ void StringBuffer::read(void *to, size_t len) {
 
 }
 
-const char *StringBuffer::data() {
+const char *StringBuffer::data() const {
     return c;
 }
 

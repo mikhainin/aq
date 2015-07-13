@@ -5,6 +5,8 @@
 #include <avro/eof.h>
 #include <avro/finished.h>
 
+#include <avro/codec/create.h>
+
 #include <filter/filter.h>
 
 #include "fileemitor.h"
@@ -22,6 +24,9 @@ void Worker::operator()() {
     std::unique_ptr<avro::BlockDecoder> decoder;
     size_t fileId = -1;
 
+    std::vector<uint8_t> storage;
+    storage.resize(1 * 1024 * 1024);
+
     while (true) {
 
         auto task = emitor.getNextTask(decoder, fileId);
@@ -30,9 +35,11 @@ void Worker::operator()() {
             break;
         }
 
-        auto &buffer = *task->buffer;
+        auto codec = avro::codec::createForHeader(*task->header);
 
-        block.buffer.assignData(buffer.data(), buffer.size());
+        auto data = codec->decode(*task->buffer, storage);
+
+        block.buffer.assignData(data);
         block.objectCount = task->objectCount;
 
         try {

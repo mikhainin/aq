@@ -77,7 +77,7 @@ public:
         return std::strncmp(s.data(), c + pointer + lastNthByte, s.size()) == 0;
     }
 
-    const char * data();
+    const char * data() const;
 
 
 private:

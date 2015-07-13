@@ -1,31 +1,20 @@
+
+aux_source_directory(node NODE_SOURCES)
+aux_source_directory(codec CODEC_SOURCES)
+aux_source_directory(predicate PREDICATE_SOURCES)
+
 add_library(avro
                  blockdecoder.cc
                  exception.cc
                  deflatedbuffer.cc
                  filehandler.cc
                  limiter.cc
-				 reader.cc
-				 schemareader.cc
+                 reader.cc
+                 schemareader.cc
                  stringbuffer.cc
 
-# TODO: move to subfolder
-                 node/array.cc
-                 node/boolean.cc
-                 node/custom.cc
-                 node/double.cc
-                 node/enum.cc
-                 node/float.cc
-                 node/int.cc
-                 node/long.cc
-                 node/map.cc
-                 node/node.cc
-                 node/nodebypath.cc
-                 node/null.cc
-                 node/record.cc
-                 node/string.cc
-                 node/union.cc
-
- # TODO: move to subfolder
-                 predicate/predicate.cc
+                 ${NODE_SOURCES}
+                 ${CODEC_SOURCES}
+                 ${PREDICATE_SOURCES}
 )
 

@@ -9,12 +9,10 @@ print as json
 sort fields on output
 configurable [CT]SV separator char
 configurable null value representation in output
-NULL compression codec support
 check condition after last used schema node
 records separator via command-line argument
 tail mode
 progressbar
-[bug] deflated buffer should grow dynamically
 output in avro format
 
 
