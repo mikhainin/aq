@@ -12,6 +12,8 @@ DeflatedBuffer::DeflatedBuffer() {
 void DeflatedBuffer::assignData(const StringBuffer &b) {
     c = b.data();
     length = b.size();
+    documentStartPointer = 0;
+    pointer = 0;
 }
 
 char DeflatedBuffer::getChar() {
