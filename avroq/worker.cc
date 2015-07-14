@@ -25,7 +25,7 @@ void Worker::operator()() {
     size_t fileId = -1;
 
     std::vector<uint8_t> storage;
-    storage.resize(1 * 1024 * 1024);
+    storage.resize(15 * 1024 * 1024);
 
     while (true) {
 
