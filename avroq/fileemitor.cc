@@ -64,7 +64,13 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
             std::cerr << "Processing " << currentFileName << std::endl;
         }
 
-        currentTaskSample.reader.reset(new avro::Reader(currentFileName));
+        try{
+            currentTaskSample.reader.reset(new avro::Reader(currentFileName));
+        } catch (const std::runtime_error &e) {
+            std::cerr << e.what() << std::endl;
+            stop = true;
+            return std::shared_ptr<Task>();
+        }
         currentTaskSample.header.reset(
                 new avro::header(currentTaskSample.reader->readHeader())
             );
