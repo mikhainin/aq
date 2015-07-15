@@ -10,7 +10,7 @@ records separator via command-line argument
 tail mode
 progressbar
 [bug] unpacking buffer should grow dynamically
-
+don't create threads if file size is small
 
 Long term TODO
 ==============
