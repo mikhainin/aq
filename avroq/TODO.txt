@@ -11,6 +11,7 @@ tail mode
 progressbar
 [bug] unpacking buffer should grow dynamically
 don't create threads if file size is small
+Don't recreate header.schema, filter expression, tsv expression if schema is not changed
 
 Long term TODO
 ==============
