@@ -82,10 +82,14 @@ int main(int argc, const char * argv[]) {
     p.add("input-file", -1);
 
     po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).
-              options(desc).positional(p).run(), vm);
-    po::notify(vm);
-
+    try {
+        po::store(po::command_line_parser(argc, argv).
+                  options(desc).positional(p).run(), vm);
+        po::notify(vm);
+    } catch(const boost::program_options::error &e) {
+        std::cerr << "Sorry, I couldn't parse arguments: " << e.what() << std::endl;
+        return 1;
+    }
     if (vm.count("help")) {
         std::cout << desc << "\n";
         return 1;
