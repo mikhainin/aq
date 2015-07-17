@@ -27,5 +27,14 @@ bool Union::containsNull() const {
     return false;
 }
 
+size_t Union::nullIndex() const {
+    for(size_t i = 0; i < children.size(); ++i) {
+        if (children[i]->is<node::Null>()) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 }
 }

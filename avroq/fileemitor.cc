@@ -99,7 +99,7 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
 
         decoder.reset(
                 new avro::BlockDecoder(
-                    *currentTaskSample.header,
+                    *task->header,
                     limiter
                 )
             );
@@ -131,7 +131,7 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
     }
 
     task->buffer.reset(new avro::StringBuffer(
-        currentTaskSample.reader->nextBlock(
+        task->reader->nextBlock(
             *task->header,
             task->objectCount
         )

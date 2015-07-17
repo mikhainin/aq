@@ -202,6 +202,8 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                 )
             );
     }
+
+    compileParser(header.schema);
 }
 
 template <typename T>
@@ -239,13 +241,17 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         return;
     }
 
-    for(int i = 0; i < block.objectCount; ++i) {
+    for(int i = 0; i < block.objectCount ; ++i) {
         // TODO: rewrite it using hierarcy of filters/decoders.
         // TODO: implement counter as a filter  
-        if (limit.finished() || block.buffer.eof()) {
+        if (limit.finished()) {
             throw Finished();
         }
+        if (block.buffer.eof()) {
+            throw Eof();
+        }
         block.buffer.startDocument();
+        //std::cout << i << " out of << " << block.objectCount << std::endl;
         decodeDocument(block.buffer, header.schema);
 
         if (!filter || filter->expressionPassed()) {
@@ -281,8 +287,17 @@ void BlockDecoder::dumpDocument(Block &block) {
 
 void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema) {
     if (schema->is<node::Record>()) {
-        for(auto &p : schema->as<node::Record>().getChildren()) {
-            decodeDocument(stream, p);
+        auto e = _pv.find(schema.get());
+        if (e != _pv.end()) {
+            std::vector<parse_func_t> &v = e->second;
+            for(int i = 0; i < v.size(); ) {
+                i += v[i](stream);
+            }
+            //std::cout << "Hit\n";
+        } else {
+            for(auto &p : schema->as<node::Record>().getChildren()) {
+                decodeDocument(stream, p);
+            }
         }
     } else if (schema->is<node::Union>()) {
         int item = TypeParser<int>::read(stream);
@@ -350,6 +365,295 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
             throw Eof();
         }
     }
+}
+
+void BlockDecoder::compileParser(const std::unique_ptr<node::Node> &schema) {
+    if (schema->is<node::Record>()) {
+        bool onlyGood = true;
+        for(auto &p : schema->as<node::Record>().getChildren()) {
+            onlyGood = onlyGood && ( p->isOneOf<
+                node::Int,
+                node::Long,
+                node::String,
+                node::Union,
+                node::Float,
+                node::Double,
+                node::Boolean>()
+
+                || (p->is<node::Custom>() &&
+                    p->as<node::Custom>().getDefinition()->is<node::Union>())
+                    )
+                ;
+            //std::cout << onlyGood <<std::endl;
+        }
+        // std::cout << "finally " << onlyGood <<std::endl;
+        if (onlyGood) {
+            //_pv[schema.get()];
+            for(auto &p : schema->as<node::Record>().getChildren()) {
+                compileParser(_pv[schema.get()], p);
+            }
+        } else {
+            for(auto &p : schema->as<node::Record>().getChildren()) {
+                compileParser(p);
+            }
+        }
+    } else if (schema->is<node::Union>()) {
+        for(auto &p : schema->as<node::Union>().getChildren()) {
+            compileParser(p);
+        }
+    } else if (schema->is<node::Custom>()) {
+        compileParser(schema->as<node::Custom>().getDefinition());
+    }
+}
+
+using parse_func_t = std::function<int(DeflatedBuffer &)>;
+
+std::vector<parse_func_t> parse_items;
+
+class ApplyUnion {
+public:
+    explicit ApplyUnion(
+                    int ret,
+                    BlockDecoder::filter_items_t::iterator start,
+                    BlockDecoder::filter_items_t::iterator end,
+                    int nullIndex)
+        : ret(ret),
+          start(start),
+          end(end),
+          nullIndex(nullIndex) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        const auto &value = TypeParser<int>::read(stream);
+        for_each (
+            start, end,
+            [&value, this](const auto& filterItem){
+                filterItem.second->setIsNull(value == this->nullIndex);
+            }
+        );
+        return value + ret;
+    }
+private:
+    int ret;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+    int nullIndex;
+};
+
+class JumpToN {
+public:
+    JumpToN(int ret, int nullIndex) : ret(ret) {
+        (void)nullIndex;
+    }
+    int operator() (DeflatedBuffer &stream) {
+        int i = TypeParser<int>::read(stream);
+        return i + ret;
+    }
+private:
+    int ret;
+};
+
+class SkipInt {
+public:
+    explicit SkipInt(int ret):ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        TypeParser<int>::skip(stream);
+        return ret;
+    }
+private:
+    int ret;
+};
+
+class SkipString {
+public:
+    explicit SkipString(int ret):ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        TypeParser<StringBuffer>::skip(stream);
+        return ret;
+    }
+private:
+    int ret;
+};
+
+class ApplyString {
+public:
+    explicit ApplyString(int ret, BlockDecoder::filter_items_t::iterator start, BlockDecoder::filter_items_t::iterator end)
+        : ret(ret),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        const auto &value = TypeParser<StringBuffer>::read(stream);
+        for_each (
+            start, end,
+            [&value](const auto& filterItem){
+                filterItem.second->template apply<StringBuffer>(value);
+            }
+        );
+        return ret;
+    }
+private:
+    int ret;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+};
+
+template <typename T>
+class Apply {
+public:
+    explicit Apply(int ret, BlockDecoder::filter_items_t::iterator start, BlockDecoder::filter_items_t::iterator end)
+        : ret(ret),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        const auto &value = TypeParser<T>::read(stream);
+        for_each (
+            start, end,
+            [&value](const auto& filterItem){
+                filterItem.second->template apply<T>(value);
+            }
+        );
+        return ret;
+    }
+private:
+    int ret;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+};
+
+
+template <int n>
+class SkipNBytes {
+public:
+    explicit SkipNBytes(int ret):ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        stream.skip(n);
+        return ret;
+    }
+private:
+    int ret;
+};
+
+int BlockDecoder::compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema) {
+    if (schema->is<node::Union>()) {
+
+        const auto &u = schema->as<node::Union>();
+
+        size_t nullIndex = -1; // u.nullIndex();
+        
+
+        auto size = u.getChildren().size();
+
+        std::vector<parse_func_t> pi;
+        auto &children = u.getChildren();
+        int i = size;
+        for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            --i;
+            auto &p = *c;
+            if (p->is<node::String>()) {
+                skipOrApplyCompileFilter_r<SkipString, ApplyString>(pi, p, size - i);
+            } else if (p->isOneOf<node::Int, node::Long>()) {
+                skipOrApplyCompileFilter_r<SkipInt, Apply<int>>(pi, p, size - i);
+            } else if (p->is<node::Float>()) {
+                skipOrApplyCompileFilter_r<SkipNBytes<4>, Apply<float>>(pi, p, size - i);
+            } else if (p->is<node::Double>()) {
+                skipOrApplyCompileFilter_r<SkipNBytes<8>, Apply<double>>(pi, p, size - i);
+            } else if (p->is<node::Boolean>()) {
+                skipOrApplyCompileFilter_r<SkipNBytes<1>, Apply<bool>>(pi, p, size - i);
+            } else if (p->is<node::Null>()) {
+                auto it = pi.begin();
+                pi.emplace(it, SkipNBytes<0>(size - i));
+                nullIndex = i;
+            } else {
+                std::cout << p->getItemName() << ":" << p->getTypeName() << std::endl;
+                std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+                throw Eof();
+            }
+        }
+
+        skipOrApplyCompileFilter<JumpToN, ApplyUnion>(parse_items, schema, 1, nullIndex);
+        for(auto &p: pi) {
+            parse_items.push_back(p);
+        }
+/*
+        for(size_t i = 0; i < size; ++i) {
+
+
+            auto &p = u.getChildren()[i];
+
+            if (p->is<node::String>()) {
+                skipOrApplyCompileFilter<SkipString, ApplyString>(parse_items, p, size - i);
+            } else if (p->isOneOf<node::Int, node::Long>()) {
+                skipOrApplyCompileFilter<SkipInt, Apply<int>>(parse_items, p, size - i);
+            } else if (p->is<node::Float>()) {
+                skipOrApplyCompileFilter<SkipNBytes<4>, Apply<float>>(parse_items, p, size - i);
+            } else if (p->is<node::Double>()) {
+                skipOrApplyCompileFilter<SkipNBytes<8>, Apply<double>>(parse_items, p, size - i);
+            } else if (p->is<node::Boolean>()) {
+                skipOrApplyCompileFilter<SkipNBytes<1>, Apply<bool>>(parse_items, p, size - i);
+            } else if (p->is<node::Null>()) {
+                parse_items.emplace_back(SkipNBytes<0>(size - i));
+            } else {
+                std::cout << p->getItemName() << ":" << p->getTypeName() << std::endl;
+                std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+                throw Eof();
+            }
+        }
+*/
+        return size;
+    } else {
+        if (schema->is<node::String>()) {
+            // parse_items.emplace_back(SkipString(1));
+            skipOrApplyCompileFilter<SkipString, ApplyString>(parse_items, schema, 1);
+        } else if (schema->isOneOf<node::Int, node::Long>()) {
+            // parse_items.emplace_back(SkipInt(1));
+            skipOrApplyCompileFilter<SkipInt, Apply<int>>(parse_items, schema, 1);
+        } else if (schema->is<node::Float>()) {
+            skipOrApplyCompileFilter<SkipNBytes<4>, Apply<float>>(parse_items, schema, 1);
+            // parse_items.emplace_back(SkipNBytes<4>(1));
+        } else if (schema->is<node::Double>()) {
+            skipOrApplyCompileFilter<SkipNBytes<8>, Apply<double>>(parse_items, schema, 1);
+        } else if (schema->is<node::Boolean>()) {
+            skipOrApplyCompileFilter<SkipNBytes<1>, Apply<bool>>(parse_items, schema, 1);
+        } else if (schema->is<node::Null>()) {
+            parse_items.emplace_back(SkipNBytes<0>(1));
+            return 0; // Empty item
+        } else {
+            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+            std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+            throw Eof();
+        }
+
+        return 1;
+    }
+}
+
+template <typename SkipType, typename ApplyType, typename... Args>
+void BlockDecoder::skipOrApplyCompileFilter_r(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
+    auto it = parse_items.begin();
+    if (filter) {
+        auto range = filterItems.equal_range(schema.get());
+        if (range.first != range.second) {
+            parse_items.emplace(it, ApplyType(ret, range.first, range.second, args...));
+            return;
+        }
+    }
+    parse_items.emplace(it, SkipType(ret, args...));
+}
+
+template <typename SkipType, typename ApplyType, typename... Args>
+void BlockDecoder::skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
+    if (filter) {
+        auto range = filterItems.equal_range(schema.get());
+        if (range.first != range.second) {
+            parse_items.emplace_back(ApplyType(ret, range.first, range.second, args...));
+            return;
+        }
+    }
+    parse_items.emplace_back(SkipType(ret, args...));
 }
 
 template <class T>

@@ -45,8 +45,10 @@ void Worker::operator()() {
         try {
             decoder->decodeAndDumpBlock(block);
         } catch (const avro::Eof &e) {
+            std::cout << "eof" << std::endl;
             ; // reading done
         } catch (const avro::Finished &e) {
+            std::cout << "fin" << std::endl;
             break;
         }
 

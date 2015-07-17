@@ -25,7 +25,9 @@ namespace predicate {
 }
 
 class BlockDecoder {
+    using parse_func_t = std::function<int(DeflatedBuffer &)>;
 public:
+    using filter_items_t = std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>>;
 
     BlockDecoder(const struct header &header, Limiter &limit);
 
@@ -41,10 +43,13 @@ private:
     Limiter &limit;
     dumper::TsvExpression tsvFieldsList;
     std::unique_ptr<filter::Filter> filter;
-    std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>> filterItems;
+    filter_items_t filterItems;
     std::function<void(const std::string &)> dumpMethod;
     std::function<void(size_t)> coutMethod;
     bool countOnly = false;
+
+    std::unordered_map<const node::Node *,std::vector<parse_func_t>>
+        _pv;
 
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 
@@ -60,6 +65,18 @@ private:
     typename T::result_type convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const;
 
     const node::Node* schemaNodeByPath(const std::string &path);
+
+    void compileParser(const std::unique_ptr<node::Node> &schema);
+
+
+    int compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema);
+
+    template <typename SkipType, typename ApplyType, typename... Args>
+    void skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);
+
+    template <typename SkipType, typename ApplyType, typename... Args>
+    void skipOrApplyCompileFilter_r(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);
+
 };
 
 
