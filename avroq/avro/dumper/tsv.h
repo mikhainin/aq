@@ -132,11 +132,11 @@ public:
     	// std::cout << *p;
     	++p;
     	while(p != toDump.end()) {
-    		outStream << "\t";
+    		outStream << whatDump.fieldSeparator;
     		(*p)->dump(outStream);
     		++p;
     	}
-    	outStream << std::endl;
+    	// outStream << std::endl;
 
         const auto &str = outStream.str();
         dumpMethod(str);

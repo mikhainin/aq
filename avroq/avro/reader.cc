@@ -147,13 +147,14 @@ void Reader::dumpSchema(const std::unique_ptr<node::Node> &schema, int level) co
     }
 }
 
-dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, const header &header) {
+dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, const header &header, const std::string &fieldSeparator) {
 
     std::vector<std::string> fields;
     boost::algorithm::split(fields, filedList, boost::is_any_of(","));
 
     dumper::TsvExpression result;
     result.pos = 0;
+    result.fieldSeparator = fieldSeparator;
 
     if (filedList.empty()) {
     	return result;

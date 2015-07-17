@@ -19,9 +19,38 @@ namespace po = boost::program_options;
 
 std::mutex screenMutex;
 
+std::string recordSeparator = "\n";
 void outDocument(const std::string &what) {
     std::lock_guard<std::mutex> screenLock(screenMutex);
     std::cout.write(what.data(), what.size());
+    std::cout << recordSeparator;
+}
+
+void updateSeparator(std::string &sep) {
+    std::string res;
+    bool esc = false;
+    for(char c : sep) {
+        if (esc) {
+            switch(c) {
+                case 'n':
+                    res += '\n';
+                    break;
+                case 't':
+                    res += '\t';
+                    break;
+                default:
+                    res += c;
+            }
+            esc = false;
+            continue;
+        }
+        if (c == '\\') {
+            esc = true;
+        } else {
+            res += c;
+        }
+    }
+    sep = res;
 }
 
 int main(int argc, const char * argv[]) {
@@ -34,6 +63,7 @@ int main(int argc, const char * argv[]) {
     std::string fields;
     bool printProcessingFile = false;
     bool countMode = false;
+    std::string fieldSeparator = "\t";
 
     po::options_description desc("Allowed options");
     desc.add_options()
@@ -45,6 +75,8 @@ int main(int argc, const char * argv[]) {
         ("print-file", po::bool_switch(&printProcessingFile), "Print name of processing file")
         ("jobs,j", po::value< u_int >(&jobs), "Number of threads to run")
         ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
+        ("record-separator", po::value<std::string>(&recordSeparator)->default_value("\\n"), "Record separator (\\n by default)")
+        ("field-separator", po::value<std::string>(&fieldSeparator)->default_value("\\t"), "Field separator for TSV output (\\t by default)")
     ;
     po::positional_options_description p;
     p.add("input-file", -1);
@@ -58,6 +90,9 @@ int main(int argc, const char * argv[]) {
         std::cout << desc << "\n";
         return 1;
     }
+
+    updateSeparator(recordSeparator);
+    updateSeparator(fieldSeparator);
 
     filter::Compiler filterCompiler;
     std::shared_ptr<filter::Filter> filter;
@@ -79,7 +114,7 @@ int main(int argc, const char * argv[]) {
         FileEmitor emitor(fileList, limit, outDocument);
 
         emitor.setFilter(filter);
-        emitor.setTsvFieldList(fields);
+        emitor.setTsvFieldList(fields, fieldSeparator);
         if (printProcessingFile) {
             emitor.enablePrintProcessingFile();
         }

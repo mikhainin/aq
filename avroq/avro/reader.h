@@ -27,7 +27,7 @@ public:
     void nextBlock(const header &header, avro::Block &block);
     avro::StringBuffer nextBlock(const header &header, int64_t &objectCountInBlock );
 
-    dumper::TsvExpression compileFieldsList(const std::string &filedList, const header &header);
+    dumper::TsvExpression compileFieldsList(const std::string &filedList, const header &header, const std::string &fieldSeparator);
 
     bool eof();
 private:

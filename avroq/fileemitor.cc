@@ -38,8 +38,9 @@ void FileEmitor::setFilter(std::shared_ptr<filter::Filter> filter) {
     this->filter = filter;
 }
 
-void FileEmitor::setTsvFieldList(const std::string &tsvFieldList) {
+void FileEmitor::setTsvFieldList(const std::string &tsvFieldList, const std::string &fieldSeparator) {
     this->tsvFieldList = tsvFieldList;
+    this->fieldSeparator = fieldSeparator;
 }
 
 
@@ -79,7 +80,8 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 new avro::dumper::TsvExpression(
                     currentTaskSample.reader->compileFieldsList(
                             tsvFieldList,
-                            *currentTaskSample.header
+                            *currentTaskSample.header,
+                            fieldSeparator
                         )
                 )
             );

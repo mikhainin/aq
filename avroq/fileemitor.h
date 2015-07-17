@@ -39,11 +39,12 @@ public:
     void enablePrintProcessingFile();
     void enableCountOnlyMode();
     void setFilter(std::shared_ptr<filter::Filter> filter);
-    void setTsvFieldList(const std::string &tsvFieldList);
+    void setTsvFieldList(const std::string &tsvFieldList, const std::string &fieldSeparator);
 
     size_t getCountedDocuments() const;
 private:
     const std::vector<std::string> &fileList;
+    std::string fieldSeparator;
     bool printProcessingFile = false;
     size_t currentFile = 0;
     std::function<void(const std::string&)> outDocument;
