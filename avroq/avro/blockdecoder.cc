@@ -132,6 +132,9 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
     for(auto &filterPredicate : filter->getPredicates()) {
         const node::Node * filterNode = schemaNodeByPath(filterPredicate->identifier);
 
+        if (filterNode->is<node::Custom>()) {
+            filterNode = filterNode->as<node::Custom>().getDefinition().get();
+        }
         if (filterNode->is<node::Union>()) {
             for( auto &p : filterNode->as<node::Union>().getChildren()) {
                 if (filterPredicate->op == filter::equality_expression::IS_NIL ||
