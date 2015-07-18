@@ -6,7 +6,6 @@ configurable null value representation in output
 check condition after last used schema node
 tail mode
 progressbar
-[bug] unpacking buffer should grow dynamically
 don't create threads if file size is small
 don't recreate header.schema, filter expression, tsv expression if schema is not changed
 
