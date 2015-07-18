@@ -104,7 +104,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                         | ("<"  >> constant [_val <  _1])
                         | (">"  >> constant [_val >  _1])
                         | ("<=" >> constant [_val <= _1])
-                        | ("=>" >> constant [_val >= _1])
+                        | (">=" >> constant [_val >= _1])
                         )
                     |
 
