@@ -43,6 +43,9 @@ void FileEmitor::setTsvFieldList(const std::string &tsvFieldList, const std::str
     this->fieldSeparator = fieldSeparator;
 }
 
+void FileEmitor::enableParseLoop() {
+    parseLoopEnabled = true;
+}
 
 std::shared_ptr<Task> FileEmitor::getNextTask(
     std::unique_ptr<avro::BlockDecoder> &decoder,
@@ -103,6 +106,9 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                     limiter
                 )
             );
+        if (parseLoopEnabled) {
+            decoder->enableParseLoop();
+        }
         if (filter) {
             try {
                 decoder->setFilter(

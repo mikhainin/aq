@@ -203,7 +203,10 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
             );
     }
 
-    compileParser(header.schema);
+    if (parseLoopEnabled) {
+        compileParser(parseLoop, header.schema);
+    }
+
 }
 
 template <typename T>
@@ -233,6 +236,11 @@ void BlockDecoder::enableCountOnlyMode() {
     countOnly = true;
 }
 
+void BlockDecoder::enableParseLoop() {
+    parseLoopEnabled = true;
+}
+
+
 void BlockDecoder::decodeAndDumpBlock(Block &block) {
 
     if (countOnly && !filter) {
@@ -252,7 +260,14 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         }
         block.buffer.startDocument();
         //std::cout << i << " out of << " << block.objectCount << std::endl;
-        decodeDocument(block.buffer, header.schema);
+        if (parseLoopEnabled) {
+            for(int i = 0; i < parseLoop.size(); ) {
+                i += parseLoop[i](block.buffer);
+            }
+            return;
+        } else {
+            decodeDocument(block.buffer, header.schema);
+        }
 
         if (!filter || filter->expressionPassed()) {
 
@@ -287,17 +302,8 @@ void BlockDecoder::dumpDocument(Block &block) {
 
 void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema) {
     if (schema->is<node::Record>()) {
-        auto e = _pv.find(schema.get());
-        if (e != _pv.end()) {
-            std::vector<parse_func_t> &v = e->second;
-            for(int i = 0; i < v.size(); ) {
-                i += v[i](stream);
-            }
-            //std::cout << "Hit\n";
-        } else {
-            for(auto &p : schema->as<node::Record>().getChildren()) {
-                decodeDocument(stream, p);
-            }
+        for(auto &p : schema->as<node::Record>().getChildren()) {
+            decodeDocument(stream, p);
         }
     } else if (schema->is<node::Union>()) {
         int item = TypeParser<int>::read(stream);
@@ -337,7 +343,7 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
 
         int objectsInBlock = 0;
         do {
-            objectsInBlock = readZigZagLong(stream);
+            objectsInBlock = TypeParser<int>::read(stream);
 
             for(int i = 0; i < objectsInBlock; ++i) {
                 TypeParser<StringBuffer>::skip(stream);
@@ -367,44 +373,6 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
     }
 }
 
-void BlockDecoder::compileParser(const std::unique_ptr<node::Node> &schema) {
-    if (schema->is<node::Record>()) {
-        bool onlyGood = true;
-        for(auto &p : schema->as<node::Record>().getChildren()) {
-            onlyGood = onlyGood && ( p->isOneOf<
-                node::Int,
-                node::Long,
-                node::String,
-                node::Union,
-                node::Float,
-                node::Double,
-                node::Boolean>()
-
-                || (p->is<node::Custom>() &&
-                    p->as<node::Custom>().getDefinition()->is<node::Union>())
-                    )
-                ;
-            //std::cout << onlyGood <<std::endl;
-        }
-        // std::cout << "finally " << onlyGood <<std::endl;
-        if (onlyGood) {
-            //_pv[schema.get()];
-            for(auto &p : schema->as<node::Record>().getChildren()) {
-                compileParser(_pv[schema.get()], p);
-            }
-        } else {
-            for(auto &p : schema->as<node::Record>().getChildren()) {
-                compileParser(p);
-            }
-        }
-    } else if (schema->is<node::Union>()) {
-        for(auto &p : schema->as<node::Union>().getChildren()) {
-            compileParser(p);
-        }
-    } else if (schema->is<node::Custom>()) {
-        compileParser(schema->as<node::Custom>().getDefinition());
-    }
-}
 
 using parse_func_t = std::function<int(DeflatedBuffer &)>;
 
@@ -537,93 +505,119 @@ private:
     int ret;
 };
 
-int BlockDecoder::compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema) {
+
+class SkipArray {
+public:
+    explicit SkipArray(int ret, BlockDecoder::const_node_t &schema, BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = TypeParser<int>::read(stream);
+            for(int i = 0; i < objectsInBlock; ++i) {
+                decoder.decodeDocument(stream, nodeType);
+            }
+        } while(objectsInBlock != 0);
+        return ret;
+    }
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+};
+
+class SkipMap {
+public:
+    explicit SkipMap(int ret, BlockDecoder::const_node_t &schema, BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = TypeParser<int>::read(stream);
+
+            for(int i = 0; i < objectsInBlock; ++i) {
+                TypeParser<StringBuffer>::skip(stream);
+                decoder.decodeDocument(stream, nodeType);
+            }
+        } while(objectsInBlock != 0);
+        return ret;
+    }
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+};
+
+
+int BlockDecoder::compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip) {
+
     if (schema->is<node::Union>()) {
 
         const auto &u = schema->as<node::Union>();
 
         size_t nullIndex = -1; // u.nullIndex();
-        
 
         auto size = u.getChildren().size();
 
-        std::vector<parse_func_t> pi;
         auto &children = u.getChildren();
         int i = size;
+
+        int elementsLeft = elementsToSkip;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
             --i;
             auto &p = *c;
-            if (p->is<node::String>()) {
-                skipOrApplyCompileFilter_r<SkipString, ApplyString>(pi, p, size - i);
-            } else if (p->isOneOf<node::Int, node::Long>()) {
-                skipOrApplyCompileFilter_r<SkipInt, Apply<int>>(pi, p, size - i);
-            } else if (p->is<node::Float>()) {
-                skipOrApplyCompileFilter_r<SkipNBytes<4>, Apply<float>>(pi, p, size - i);
-            } else if (p->is<node::Double>()) {
-                skipOrApplyCompileFilter_r<SkipNBytes<8>, Apply<double>>(pi, p, size - i);
-            } else if (p->is<node::Boolean>()) {
-                skipOrApplyCompileFilter_r<SkipNBytes<1>, Apply<bool>>(pi, p, size - i);
-            } else if (p->is<node::Null>()) {
-                auto it = pi.begin();
-                pi.emplace(it, SkipNBytes<0>(size - i));
+            if (p->is<node::Null>()) {
                 nullIndex = i;
-            } else {
-                std::cout << p->getItemName() << ":" << p->getTypeName() << std::endl;
-                std::cout << "Can't read type: no decoder. Finishing." << std::endl;
-                throw Eof();
             }
+            elementsLeft += compileParser(parse_items, p, elementsLeft);
         }
 
-        skipOrApplyCompileFilter<JumpToN, ApplyUnion>(parse_items, schema, 1, nullIndex);
-        for(auto &p: pi) {
-            parse_items.push_back(p);
+        skipOrApplyCompileFilter_r<JumpToN, ApplyUnion>(parse_items, schema, elementsToSkip, nullIndex);
+
+        return elementsLeft;
+    } else if (schema->is<node::Custom>()) {
+        return compileParser(parse_items, schema->as<node::Custom>().getDefinition());
+    } else if (schema->is<node::Record>()) {
+        auto &children = schema->as<node::Record>().getChildren();
+        size_t size = 0;
+        for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            size += compileParser(parse_items, *c);
         }
-/*
-        for(size_t i = 0; i < size; ++i) {
-
-
-            auto &p = u.getChildren()[i];
-
-            if (p->is<node::String>()) {
-                skipOrApplyCompileFilter<SkipString, ApplyString>(parse_items, p, size - i);
-            } else if (p->isOneOf<node::Int, node::Long>()) {
-                skipOrApplyCompileFilter<SkipInt, Apply<int>>(parse_items, p, size - i);
-            } else if (p->is<node::Float>()) {
-                skipOrApplyCompileFilter<SkipNBytes<4>, Apply<float>>(parse_items, p, size - i);
-            } else if (p->is<node::Double>()) {
-                skipOrApplyCompileFilter<SkipNBytes<8>, Apply<double>>(parse_items, p, size - i);
-            } else if (p->is<node::Boolean>()) {
-                skipOrApplyCompileFilter<SkipNBytes<1>, Apply<bool>>(parse_items, p, size - i);
-            } else if (p->is<node::Null>()) {
-                parse_items.emplace_back(SkipNBytes<0>(size - i));
-            } else {
-                std::cout << p->getItemName() << ":" << p->getTypeName() << std::endl;
-                std::cout << "Can't read type: no decoder. Finishing." << std::endl;
-                throw Eof();
-            }
-        }
-*/
         return size;
+    } else if (schema->is<node::Array>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+            return 1;
+    } else if (schema->is<node::Map>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+            return 1;
     } else {
         if (schema->is<node::String>()) {
-            // parse_items.emplace_back(SkipString(1));
-            skipOrApplyCompileFilter<SkipString, ApplyString>(parse_items, schema, 1);
-        } else if (schema->isOneOf<node::Int, node::Long>()) {
-            // parse_items.emplace_back(SkipInt(1));
-            skipOrApplyCompileFilter<SkipInt, Apply<int>>(parse_items, schema, 1);
+            skipOrApplyCompileFilter_r<SkipString, ApplyString>(parse_items, schema, elementsToSkip);
+        } else if (schema->isOneOf<node::Enum, node::Int, node::Long>()) {
+            skipOrApplyCompileFilter_r<SkipInt, Apply<int>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Float>()) {
-            skipOrApplyCompileFilter<SkipNBytes<4>, Apply<float>>(parse_items, schema, 1);
-            // parse_items.emplace_back(SkipNBytes<4>(1));
+            skipOrApplyCompileFilter_r<SkipNBytes<4>, Apply<float>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Double>()) {
-            skipOrApplyCompileFilter<SkipNBytes<8>, Apply<double>>(parse_items, schema, 1);
+            skipOrApplyCompileFilter_r<SkipNBytes<8>, Apply<double>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Boolean>()) {
-            skipOrApplyCompileFilter<SkipNBytes<1>, Apply<bool>>(parse_items, schema, 1);
+            skipOrApplyCompileFilter_r<SkipNBytes<1>, Apply<bool>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Null>()) {
-            parse_items.emplace_back(SkipNBytes<0>(1));
-            return 0; // Empty item
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipNBytes<0>(elementsToSkip));
+            return 1; // Empty item. TODO: do not even insert it
         } else {
             std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
-            std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+            std::cout << "compileParser: Can't read type: no decoder. Finishing." << std::endl;
             throw Eof();
         }
 

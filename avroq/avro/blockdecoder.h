@@ -25,9 +25,12 @@ namespace predicate {
 }
 
 class BlockDecoder {
+    friend class SkipArray;
+    friend class SkipMap;
     using parse_func_t = std::function<int(DeflatedBuffer &)>;
 public:
     using filter_items_t = std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>>;
+    using const_node_t = const std::unique_ptr<node::Node>;
 
     BlockDecoder(const struct header &header, Limiter &limit);
 
@@ -37,6 +40,7 @@ public:
     void setDumpMethod(std::function<void(const std::string &)> dumpMethod);
     void setCountMethod(std::function<void(size_t)> coutMethod);
     void enableCountOnlyMode();
+    void enableParseLoop();
 
 private:
     const struct header &header;
@@ -47,9 +51,8 @@ private:
     std::function<void(const std::string &)> dumpMethod;
     std::function<void(size_t)> coutMethod;
     bool countOnly = false;
-
-    std::unordered_map<const node::Node *,std::vector<parse_func_t>>
-        _pv;
+    bool parseLoopEnabled = false;
+    std::vector<parse_func_t> parseLoop;
 
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 
@@ -66,10 +69,7 @@ private:
 
     const node::Node* schemaNodeByPath(const std::string &path);
 
-    void compileParser(const std::unique_ptr<node::Node> &schema);
-
-
-    int compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema);
+    int compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip = 1);
 
     template <typename SkipType, typename ApplyType, typename... Args>
     void skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);

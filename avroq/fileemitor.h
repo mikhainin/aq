@@ -38,6 +38,7 @@ public:
 
     void enablePrintProcessingFile();
     void enableCountOnlyMode();
+    void enableParseLoop();
     void setFilter(std::shared_ptr<filter::Filter> filter);
     void setTsvFieldList(const std::string &tsvFieldList, const std::string &fieldSeparator);
 
@@ -56,6 +57,7 @@ private:
     std::atomic_size_t countedDocuments;
     bool stop = false;
     bool countMode = false;
+    bool parseLoopEnabled = false;
 
     bool canProduceNextTask();
 

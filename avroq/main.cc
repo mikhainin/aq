@@ -63,6 +63,7 @@ int main(int argc, const char * argv[]) {
     std::string fields;
     bool printProcessingFile = false;
     bool countMode = false;
+    bool disableParseLoop = false;
     std::string fieldSeparator = "\t";
 
     po::options_description desc("Allowed options");
@@ -77,7 +78,9 @@ int main(int argc, const char * argv[]) {
         ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
         ("record-separator", po::value<std::string>(&recordSeparator)->default_value("\\n"), "Record separator (\\n by default)")
         ("field-separator", po::value<std::string>(&fieldSeparator)->default_value("\\t"), "Field separator for TSV output (\\t by default)")
+        ("disable-parse-loop", po::bool_switch(&disableParseLoop), "Disable experimental parsing mode (enabled by default)")
     ;
+
     po::positional_options_description p;
     p.add("input-file", -1);
 
@@ -120,6 +123,9 @@ int main(int argc, const char * argv[]) {
         }
         if (countMode) {
             emitor.enableCountOnlyMode();
+        }
+        if ( ! disableParseLoop ) {
+            emitor.enableParseLoop();
         }
         std::vector<std::thread> workers;
 
