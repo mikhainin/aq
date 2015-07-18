@@ -69,7 +69,7 @@ private:
 
     const node::Node* schemaNodeByPath(const std::string &path);
 
-    int compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip = 1);
+    int compileFilteringParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip = 1);
 
     template <typename SkipType, typename ApplyType, typename... Args>
     void skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);

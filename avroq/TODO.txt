@@ -1,24 +1,21 @@
 TODO
 ====
 print names/values in columns (to be able to copy field names)
-print as json
-sort fields on output
-configurable [CT]SV separator char
+sort fields on output (fool formatter)
 configurable null value representation in output
 check condition after last used schema node
-records separator via command-line argument
 tail mode
 progressbar
 [bug] unpacking buffer should grow dynamically
 don't create threads if file size is small
-Don't recreate header.schema, filter expression, tsv expression if schema is not changed
+don't recreate header.schema, filter expression, tsv expression if schema is not changed
 
 Long term TODO
 ==============
 query JSON
 query protobuf
 print protobuf content
-display ad JSON
+display as JSON
 select fields to print (for non-TSV output)
 AVRO as output format
 

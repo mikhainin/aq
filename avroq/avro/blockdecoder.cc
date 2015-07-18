@@ -204,7 +204,7 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
     }
 
     if (parseLoopEnabled) {
-        compileParser(parseLoop, header.schema);
+        compileFilteringParser(parseLoop, header.schema);
     }
 
 }
@@ -264,7 +264,6 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
             for(int i = 0; i < parseLoop.size(); ) {
                 i += parseLoop[i](block.buffer);
             }
-            return;
         } else {
             decodeDocument(block.buffer, header.schema);
         }
@@ -557,7 +556,7 @@ private:
 };
 
 
-int BlockDecoder::compileParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip) {
+int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip) {
 
     if (schema->is<node::Union>()) {
 
@@ -577,19 +576,19 @@ int BlockDecoder::compileParser(std::vector<parse_func_t> &parse_items, const st
             if (p->is<node::Null>()) {
                 nullIndex = i;
             }
-            elementsLeft += compileParser(parse_items, p, elementsLeft);
+            elementsLeft += compileFilteringParser(parse_items, p, elementsLeft);
         }
 
         skipOrApplyCompileFilter_r<JumpToN, ApplyUnion>(parse_items, schema, elementsToSkip, nullIndex);
 
         return elementsLeft;
     } else if (schema->is<node::Custom>()) {
-        return compileParser(parse_items, schema->as<node::Custom>().getDefinition());
+        return compileFilteringParser(parse_items, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Record>()) {
         auto &children = schema->as<node::Record>().getChildren();
         size_t size = 0;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
-            size += compileParser(parse_items, *c);
+            size += compileFilteringParser(parse_items, *c);
         }
         return size;
     } else if (schema->is<node::Array>()) {
@@ -718,7 +717,6 @@ void BlockDecoder::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<no
         } else if (schema->is<node::Int>()) {
             int value = readZigZagLong(stream);
             dumper.Int(value, schema->as<node::Int>());
-            // std::cout << schema->getItemName() << ": " << value << std::endl;
         } else if (schema->is<node::Long>()) {
             long value = readZigZagLong(stream);
             dumper.Long(value, schema->as<node::Long>());
