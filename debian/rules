@@ -15,7 +15,7 @@
 override_dh_auto_build:
 	mkdir -p build
 	cd build && cmake ../avroq -DCMAKE_CXX_FLAGS='-I/opt/gcc-4.9.2/include/c++/4.9.2/ -ggdb3 -O3 -gdwarf-2' -DCMAKE_CXX_COMPILER=/opt/gcc-4.9.2/bin/g++
-	cd build && make
+	cd build && make -j4
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/aq

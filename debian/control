@@ -1,7 +1,7 @@
 Source: aq
 Section: unknown
 Priority: extra
-Maintainer: Mikhail Galanin <bespoleznyak@narod.ru>
+Maintainer: Mikhail Galanin <mikhail.galanin@yahoo.com>
 Build-Depends: debhelper (>= 7.0.50), cmake
 Standards-Version: 3.8.4
 Homepage: https://bitbucket.org/mikhainin/
