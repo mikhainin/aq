@@ -205,6 +205,11 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                 )
             );
     }
+
+    if (parseLoopEnabled) {
+        compileFilteringParser(parseLoop, header.schema);
+    }
+
 }
 
 template <typename T>
@@ -220,6 +225,10 @@ typename T::result_type BlockDecoder::convertFilterConstant(const filter::equali
 
 void BlockDecoder::setTsvFilterExpression(const dumper::TsvExpression &tsvFieldsList) {
     this->tsvFieldsList = tsvFieldsList;
+
+    if (parseLoopEnabled) {
+        compileTsvExpression(tsvDumpLoop, header.schema);
+    }
 }
 
 void BlockDecoder::setDumpMethod(std::function<void(const std::string &)> dumpMethod) {
@@ -234,6 +243,11 @@ void BlockDecoder::enableCountOnlyMode() {
     countOnly = true;
 }
 
+void BlockDecoder::enableParseLoop() {
+    parseLoopEnabled = true;
+}
+
+
 void BlockDecoder::decodeAndDumpBlock(Block &block) {
 
     if (countOnly && !filter) {
@@ -242,14 +256,24 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         return;
     }
 
-    for(int i = 0; i < block.objectCount; ++i) {
+    for(int i = 0; i < block.objectCount ; ++i) {
         // TODO: rewrite it using hierarcy of filters/decoders.
         // TODO: implement counter as a filter  
-        if (limit.finished() || block.buffer.eof()) {
+        if (limit.finished()) {
             throw Finished();
         }
+        if (block.buffer.eof()) {
+            throw Eof();
+        }
         block.buffer.startDocument();
-        decodeDocument(block.buffer, header.schema);
+        //std::cout << i << " out of << " << block.objectCount << std::endl;
+        if (parseLoopEnabled) {
+            for(int i = 0; i < parseLoop.size(); ) {
+                i += parseLoop[i](block.buffer);
+            }
+        } else {
+            decodeDocument(block.buffer, header.schema);
+        }
 
         if (!filter || filter->expressionPassed()) {
 
@@ -272,7 +296,13 @@ void BlockDecoder::dumpDocument(Block &block) {
     block.buffer.resetToDocument();
     if (tsvFieldsList.pos > 0) {
         dumper::Tsv dumper(tsvFieldsList);
-        dumpDocument(block.buffer, header.schema, dumper);
+        if (parseLoopEnabled) {
+            for(int i = 0; i < tsvDumpLoop.size(); ) {
+                i += tsvDumpLoop[i](block.buffer, dumper);
+            }
+        } else {
+            dumpDocument(block.buffer, header.schema, dumper);
+        }
         dumper.EndDocument(dumpMethod);
     } else {
         dumper::Fool dumper;
@@ -325,7 +355,7 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
 
         int objectsInBlock = 0;
         do {
-            objectsInBlock = readZigZagLong(stream);
+            objectsInBlock = TypeParser<int>::read(stream);
 
             for(int i = 0; i < objectsInBlock; ++i) {
                 TypeParser<StringBuffer>::skip(stream);
@@ -354,6 +384,428 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         }
     }
 }
+
+
+using parse_func_t = std::function<int(DeflatedBuffer &)>;
+
+std::vector<parse_func_t> parse_items;
+
+class ApplyUnion {
+public:
+    explicit ApplyUnion(
+                    int ret,
+                    BlockDecoder::filter_items_t::iterator start,
+                    BlockDecoder::filter_items_t::iterator end,
+                    int nullIndex)
+        : ret(ret),
+          start(start),
+          end(end),
+          nullIndex(nullIndex) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        const auto &value = TypeParser<int>::read(stream);
+        for_each (
+            start, end,
+            [&value, this](const auto& filterItem){
+                filterItem.second->setIsNull(value == this->nullIndex);
+            }
+        );
+        return value + ret;
+    }
+private:
+    int ret;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+    int nullIndex;
+};
+
+class JumpToN {
+public:
+    JumpToN(int ret, int nullIndex) : ret(ret) {
+        (void)nullIndex;
+    }
+    int operator() (DeflatedBuffer &stream) {
+        int i = TypeParser<int>::read(stream);
+        return i + ret;
+    }
+private:
+    int ret;
+};
+
+class SkipInt {
+public:
+    explicit SkipInt(int ret):ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        TypeParser<int>::skip(stream);
+        return ret;
+    }
+private:
+    int ret;
+};
+
+class SkipString {
+public:
+    explicit SkipString(int ret):ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        TypeParser<StringBuffer>::skip(stream);
+        return ret;
+    }
+private:
+    int ret;
+};
+
+class ApplyString {
+public:
+    explicit ApplyString(int ret, BlockDecoder::filter_items_t::iterator start, BlockDecoder::filter_items_t::iterator end)
+        : ret(ret),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        const auto &value = TypeParser<StringBuffer>::read(stream);
+        for_each (
+            start, end,
+            [&value](const auto& filterItem){
+                filterItem.second->template apply<StringBuffer>(value);
+            }
+        );
+        return ret;
+    }
+private:
+    int ret;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+};
+
+template <typename T>
+class Apply {
+public:
+    explicit Apply(int ret, BlockDecoder::filter_items_t::iterator start, BlockDecoder::filter_items_t::iterator end)
+        : ret(ret),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        const auto &value = TypeParser<T>::read(stream);
+        for_each (
+            start, end,
+            [&value](const auto& filterItem){
+                filterItem.second->template apply<T>(value);
+            }
+        );
+        return ret;
+    }
+private:
+    int ret;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+};
+
+
+template <int n>
+class SkipNBytes {
+public:
+    explicit SkipNBytes(int ret):ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+        stream.skip(n);
+        return ret;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        return operator() (stream);
+    }
+private:
+    int ret;
+};
+
+
+class SkipArray {
+public:
+    explicit SkipArray(int ret, BlockDecoder::const_node_t &schema, BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = TypeParser<int>::read(stream);
+            for(int i = 0; i < objectsInBlock; ++i) {
+                decoder.decodeDocument(stream, nodeType);
+            }
+        } while(objectsInBlock != 0);
+        return ret;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        return operator() (stream);
+    }
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+};
+
+class SkipMap {
+public:
+    explicit SkipMap(int ret, BlockDecoder::const_node_t &schema, BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = TypeParser<int>::read(stream);
+
+            for(int i = 0; i < objectsInBlock; ++i) {
+                TypeParser<StringBuffer>::skip(stream);
+                decoder.decodeDocument(stream, nodeType);
+            }
+        } while(objectsInBlock != 0);
+        return ret;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        return operator() (stream);
+    }
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+};
+
+
+int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip) {
+
+    if (schema->is<node::Union>()) {
+
+        const auto &u = schema->as<node::Union>();
+
+        size_t nullIndex = -1; // u.nullIndex();
+
+        auto size = u.getChildren().size();
+
+        auto &children = u.getChildren();
+        int i = size;
+
+        int elementsLeft = elementsToSkip;
+        for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            --i;
+            auto &p = *c;
+            if (p->is<node::Null>()) {
+                nullIndex = i;
+            }
+            elementsLeft += compileFilteringParser(parse_items, p, elementsLeft);
+        }
+
+        skipOrApplyCompileFilter<JumpToN, ApplyUnion>(parse_items, schema, elementsToSkip, nullIndex);
+
+        return elementsLeft;
+    } else if (schema->is<node::Custom>()) {
+        return compileFilteringParser(parse_items, schema->as<node::Custom>().getDefinition());
+    } else if (schema->is<node::Record>()) {
+        auto &children = schema->as<node::Record>().getChildren();
+        size_t size = 0;
+        for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            size += compileFilteringParser(parse_items, *c);
+        }
+        return size;
+    } else if (schema->is<node::Array>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+            return 1;
+    } else if (schema->is<node::Map>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+            return 1;
+    } else {
+        if (schema->is<node::String>()) {
+            skipOrApplyCompileFilter<SkipString, ApplyString>(parse_items, schema, elementsToSkip);
+        } else if (schema->isOneOf<node::Enum, node::Int, node::Long>()) {
+            skipOrApplyCompileFilter<SkipInt, Apply<int>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Float>()) {
+            skipOrApplyCompileFilter<SkipNBytes<4>, Apply<float>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Double>()) {
+            skipOrApplyCompileFilter<SkipNBytes<8>, Apply<double>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Boolean>()) {
+            skipOrApplyCompileFilter<SkipNBytes<1>, Apply<bool>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Null>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipNBytes<0>(elementsToSkip));
+            return 1; // Empty item. TODO: do not even insert it
+        } else {
+            // TODO fire runtime_error here
+            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+            std::cout << "compileParser: Can't read type: no decoder. Finishing." << std::endl;
+            throw Eof();
+        }
+
+        return 1;
+    }
+}
+
+template <typename SkipType, typename ApplyType, typename... Args>
+void BlockDecoder::skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
+    auto it = parse_items.begin();
+    if (filter) {
+        auto range = filterItems.equal_range(schema.get());
+        if (range.first != range.second) {
+            parse_items.emplace(it, ApplyType(ret, range.first, range.second, args...));
+            return;
+        }
+    }
+    parse_items.emplace(it, SkipType(ret, args...));
+}
+
+
+template<typename T>
+class ApplyTsv {
+public:
+    ApplyTsv(int ret, int position)
+        : ret(ret),
+          position(position) {
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        const auto &value = TypeParser<T>::read(stream);
+        tsv.addToPosition(value, position);
+        return ret;
+    }
+private:
+    int ret;
+    int position;
+};
+
+
+class ApplyTsvNull {
+public:
+    ApplyTsvNull(int ret, int position)
+        : ret(ret),
+          position(position) {
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        tsv.addToPosition(stringifyedNull, position);
+        return ret;
+    }
+private:
+    const std::string stringifyedNull = "null";
+    int ret;
+    int position;
+};
+
+
+template <typename T>
+class ParseToTsvAdapter : public T {
+public:
+    template<typename... Args>
+    ParseToTsvAdapter(Args... args)
+        : T(args...) {
+    }
+
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        return this->T::operator ()(stream);
+    }
+
+};
+
+class JumpToNTsv {
+public:
+    JumpToNTsv(int ret) : ret(ret) {
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        int i = TypeParser<int>::read(stream);
+        return i + ret;
+    }
+private:
+    int ret;
+};
+
+int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip) {
+
+    if (schema->is<node::Union>()) {
+
+        const auto &u = schema->as<node::Union>();
+
+        size_t nullIndex = -1; // u.nullIndex();
+
+        auto size = u.getChildren().size();
+
+        auto &children = u.getChildren();
+        int i = size;
+
+        int elementsLeft = elementsToSkip;
+        for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            --i;
+            auto &p = *c;
+            if (p->is<node::Null>()) {
+                nullIndex = i;
+            }
+            elementsLeft += compileTsvExpression(parse_items, p, elementsLeft);
+        }
+
+        auto it = parse_items.begin();
+        parse_items.emplace(it, JumpToNTsv(elementsToSkip));
+
+        return elementsLeft;
+    } else if (schema->is<node::Custom>()) {
+        return compileTsvExpression(parse_items, schema->as<node::Custom>().getDefinition());
+    } else if (schema->is<node::Record>()) {
+        auto &children = schema->as<node::Record>().getChildren();
+        size_t size = 0;
+        for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            size += compileTsvExpression(parse_items, *c);
+        }
+        return size;
+    } else if (schema->is<node::Array>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+            return 1;
+    } else if (schema->is<node::Map>()) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+            return 1;
+    } else {
+        if (schema->is<node::String>()) {
+            skipOrApplyTsvExpression<ParseToTsvAdapter<SkipString>, ApplyTsv<StringBuffer>>(parse_items, schema, elementsToSkip);
+        } else if (schema->isOneOf<node::Enum, node::Int, node::Long>()) {
+            skipOrApplyTsvExpression<ParseToTsvAdapter<SkipInt>, ApplyTsv<int>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Float>()) {
+            skipOrApplyTsvExpression<SkipNBytes<4>, ApplyTsv<float>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Double>()) {
+            skipOrApplyTsvExpression<SkipNBytes<8>, ApplyTsv<double>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Boolean>()) {
+            skipOrApplyTsvExpression<SkipNBytes<1>, ApplyTsv<bool>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Null>()) {
+            skipOrApplyTsvExpression<SkipNBytes<0>, ApplyTsvNull>(parse_items, schema, elementsToSkip);
+            return 1; // Empty item. TODO: do not even insert it
+        } else {
+            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+            std::cout << "compileParser: Can't read type: no decoder. Finishing." << std::endl;
+            throw Eof();
+        }
+
+        return 1;
+    }
+}
+
+
+template <typename SkipType, typename ApplyType, typename... Args>
+void BlockDecoder::skipOrApplyTsvExpression(std::vector<dump_tsv_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
+    auto it = parse_items.begin();
+    auto p = tsvFieldsList.what.find(schema->getNumber());
+    if (p != tsvFieldsList.what.end()) {
+        parse_items.emplace(it, ApplyType(ret, p->second, args...));
+        return;
+    }
+    parse_items.emplace(it, SkipType(ret, args...));
+}
+
 
 template <class T>
 void BlockDecoder::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema, T &dumper) {
@@ -423,7 +875,6 @@ void BlockDecoder::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<no
         } else if (schema->is<node::Int>()) {
             int value = readZigZagLong(stream);
             dumper.Int(value, schema->as<node::Int>());
-            // std::cout << schema->getItemName() << ": " << value << std::endl;
         } else if (schema->is<node::Long>()) {
             long value = readZigZagLong(stream);
             dumper.Long(value, schema->as<node::Long>());

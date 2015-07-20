@@ -7,9 +7,6 @@
 
 #include <boost/program_options.hpp>
 
-// TODO: remove this include (node.h) from this file as it's an implementation detail
-#include "avro/node/node.h"
-
 #include "filter/filter.h"
 #include "filter/compiler.h"
 
@@ -53,6 +50,16 @@ void updateSeparator(std::string &sep) {
     sep = res;
 }
 
+void correctJobsNumber(u_int &jobs) {
+    if (jobs < 1) {
+        std::cerr << "hint: adjusing threads number to 1" << std::endl;
+        jobs = 1;
+    } else if (jobs > 10) {
+        std::cerr << "hint: do not be so greedy. adjusing threads number to 10" << std::endl;
+        jobs = 1;
+    }
+}
+
 int main(int argc, const char * argv[]) {
 
     std::cout.sync_with_stdio(false);
@@ -63,6 +70,7 @@ int main(int argc, const char * argv[]) {
     std::string fields;
     bool printProcessingFile = false;
     bool countMode = false;
+    bool disableParseLoop = false;
     std::string fieldSeparator = "\t";
 
     po::options_description desc("Allowed options");
@@ -77,7 +85,9 @@ int main(int argc, const char * argv[]) {
         ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
         ("record-separator", po::value<std::string>(&recordSeparator)->default_value("\\n"), "Record separator (\\n by default)")
         ("field-separator", po::value<std::string>(&fieldSeparator)->default_value("\\t"), "Field separator for TSV output (\\t by default)")
+        ("disable-parse-loop", po::bool_switch(&disableParseLoop), "Disable experimental parsing mode (enabled by default)")
     ;
+
     po::positional_options_description p;
     p.add("input-file", -1);
 
@@ -125,7 +135,12 @@ int main(int argc, const char * argv[]) {
         if (countMode) {
             emitor.enableCountOnlyMode();
         }
+        if ( ! disableParseLoop ) {
+            emitor.enableParseLoop();
+        }
         std::vector<std::thread> workers;
+
+        correctJobsNumber(jobs);
 
         for(u_int i = 0; i < jobs; ++i) { // TODO: check for inadequate values
             workers.emplace_back(
@@ -136,6 +151,7 @@ int main(int argc, const char * argv[]) {
         for(auto &p : workers) {
             p.join();
         }
+
         if (countMode) {
             std::cout << "Matched documents: " << emitor.getCountedDocuments() << std::endl;
         }

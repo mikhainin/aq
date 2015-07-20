@@ -61,6 +61,11 @@ public:
     	}
     }
 
+    template<typename T>
+    void addToPosition(const T &t, int position) {
+        toDump[position].reset(new TDumper<T>(t));
+    }
+
     void String(const StringBuffer &s, const node::String &n) {
     	addIfNecessary(s, n);
     }
@@ -98,7 +103,6 @@ public:
     }
 
     void Union(int index, const node::Union &n) {
-
     }
 
     void RecordBegin(const node::Record &r) {
@@ -129,18 +133,14 @@ public:
     void EndDocument(std::function<void(const std::string &)> dumpMethod) {
     	auto p = toDump.begin();
     	(*p)->dump(outStream);
-    	// std::cout << *p;
     	++p;
     	while(p != toDump.end()) {
     		outStream << whatDump.fieldSeparator;
     		(*p)->dump(outStream);
     		++p;
     	}
-    	// outStream << std::endl;
-
         const auto &str = outStream.str();
         dumpMethod(str);
-        // std::cout.write(str.data(), str.size());
     }
 
 private:

@@ -15,6 +15,7 @@ public:
     const std::vector<std::unique_ptr<Node> > &getChildren() const;
 
     bool containsNull() const;
+    size_t nullIndex() const;
 private:
     std::vector<std::unique_ptr<Node>> children;
 };
