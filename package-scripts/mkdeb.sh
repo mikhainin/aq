@@ -1,5 +1,5 @@
 #!/bin/sh
 
 sudo apt-get install fakeroot-ng git-buildpackage debhelper build-essential
-git-buildpackage --git-upstream-tree=master --git-ignore-new --git-verbose
+BOOST_ROOT=/home/mgalanin/boost_1_57_0/ DH_VERBOSE=1 dpkg-buildpackage
 

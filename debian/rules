@@ -11,3 +11,33 @@
 
 %:
 	dh $@ 
+
+override_dh_auto_build:
+	mkdir -p build
+	cd build && cmake ../avroq -DCMAKE_CXX_FLAGS='-I/opt/gcc-4.9.2/include/c++/4.9.2/ -ggdb3 -O3 -gdwarf-2' -DCMAKE_CXX_COMPILER=/opt/gcc-4.9.2/bin/g++
+	cd build && make
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/aq
+	mkdir -p $(CURDIR)/debian/aq/usr/bin/
+	
+	#objcopy --only-keep-debug $(CURDIR)/build/aq $(CURDIR)/build/aq.debug
+	#strip -g $(CURDIR)/build/aq
+	#objcopy --add-gnu-debuglink=$(CURDIR)/build/aq.debug $(CURDIR)/build/aq
+
+	install $(CURDIR)/build/aq $(CURDIR)/debian/aq/usr/bin/aq
+	
+	#mkdir -p $(CURDIR)/debian/aq-dbg/usr/bin/
+	#install $(CURDIR)/build/aq.debug $(CURDIR)/debian/aq-dbg/usr/bin/aq.debug
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=aq
+
+.PHONY: override_dh_strip
+override_dh_strip:
+	dh_strip --dbg-package=aq-dbg
+
+
+clean:
+	dh_clean
+	rm -fr build
