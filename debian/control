@@ -1,0 +1,14 @@
+Source: aq
+Section: unknown
+Priority: extra
+Maintainer: Mikhail Galanin <bespoleznyak@narod.ru>
+Build-Depends: debhelper (>= 7.0.50~), cmake
+Standards-Version: 3.8.4
+Homepage: https://bitbucket.org/mikhainin/
+Vcs-Git: https://bitbucket.org/mikhainin/avroq.git
+Vcs-Browser: https://bitbucket.org/mikhainin/
+
+Package: aq
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Avro-files grep tool
