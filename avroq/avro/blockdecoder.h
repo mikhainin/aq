@@ -17,6 +17,9 @@ struct header;
 class DeflatedBuffer;
 class Limiter;
 
+namespace dumper {
+    class Tsv;
+}
 namespace node {
     class Node;
 }
@@ -28,6 +31,7 @@ class BlockDecoder {
     friend class SkipArray;
     friend class SkipMap;
     using parse_func_t = std::function<int(DeflatedBuffer &)>;
+    using dump_tsv_func_t = std::function<int(DeflatedBuffer &, dumper::Tsv &t)>;
 public:
     using filter_items_t = std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>>;
     using const_node_t = const std::unique_ptr<node::Node>;
@@ -53,6 +57,7 @@ private:
     bool countOnly = false;
     bool parseLoopEnabled = false;
     std::vector<parse_func_t> parseLoop;
+    std::vector<dump_tsv_func_t> tsvDumpLoop;
 
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 
@@ -74,9 +79,10 @@ private:
     template <typename SkipType, typename ApplyType, typename... Args>
     void skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);
 
-    template <typename SkipType, typename ApplyType, typename... Args>
-    void skipOrApplyCompileFilter_r(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);
+    int compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip = 1);
 
+    template <typename SkipType, typename ApplyType, typename... Args>
+    void skipOrApplyTsvExpression(std::vector<dump_tsv_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args);
 };
 
 
