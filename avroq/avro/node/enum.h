@@ -16,6 +16,9 @@ public:
     void addValue(const std::string &value);
     const std::string &operator[](int i) const;
 
+    // TODO: return const ref here
+    std::vector<std::string> getItems() const;
+
     // -1 if not found
     int findIndexForValue(const std::string &value) const;
 private:

@@ -161,7 +161,12 @@ dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, co
     }
 
     for(auto p = fields.begin(); p != fields.end(); ++p) {
-        const auto node = schemaNodeByPath(*p, header);
+        auto node = schemaNodeByPath(*p, header);
+
+        if (node->is<node::Custom>()) {
+            node = node->as<node::Custom>().getDefinition().get();
+        }
+
         result.what[node->getNumber()] = result.pos;
         if (node->is<node::Union>()) {
         	for( auto &p : node->as<node::Union>().getChildren()) {

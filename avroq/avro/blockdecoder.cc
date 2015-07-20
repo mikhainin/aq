@@ -698,6 +698,39 @@ private:
     int position;
 };
 
+class ApplyTsvEnum {
+public:
+    ApplyTsvEnum(int ret, int position, const std::vector<std::string> &items)
+        : ret(ret),
+          position(position),
+          items(items) {
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        int item = TypeParser<int>::read(stream);
+        tsv.addToPosition(items[item], position);
+        return ret;
+    }
+private:
+    const std::string stringifyedNull = "null";
+    int ret;
+    int position;
+    const std::vector<std::string> items;
+};
+class SkipTsvEnum {
+public:
+    SkipTsvEnum(int ret, const std::vector<std::string> &items)
+        : ret(ret) {
+          (void)items;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        TypeParser<int>::skip(stream);
+        return ret;
+    }
+private:
+    int ret;
+};
+
+
 
 template <typename T>
 class ParseToTsvAdapter : public T {
@@ -763,8 +796,15 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
     } else {
         if (schema->is<node::String>()) {
             skipOrApplyTsvExpression<ParseToTsvAdapter<SkipString>, ApplyTsv<StringBuffer>>(parse_items, schema, elementsToSkip);
-        } else if (schema->isOneOf<node::Enum, node::Int, node::Long>()) {
+        } else if (schema->isOneOf<node::Int, node::Long>()) {
             skipOrApplyTsvExpression<ParseToTsvAdapter<SkipInt>, ApplyTsv<int>>(parse_items, schema, elementsToSkip);
+        } else if (schema->is<node::Enum>()) {
+            skipOrApplyTsvExpression<SkipTsvEnum, ApplyTsvEnum>(
+                    parse_items,
+                    schema,
+                    elementsToSkip,
+                    schema->as<node::Enum>().getItems()
+                );
         } else if (schema->is<node::Float>()) {
             skipOrApplyTsvExpression<SkipNBytes<4>, ApplyTsv<float>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Double>()) {

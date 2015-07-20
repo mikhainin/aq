@@ -28,5 +28,9 @@ int Enum::findIndexForValue(const std::string &value) const {
     return -1;
 }
 
+std::vector<std::string> Enum::getItems() const {
+    return values;
+}
+
 }
 }

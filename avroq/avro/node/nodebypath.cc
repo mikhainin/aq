@@ -21,7 +21,7 @@ const Node *nodeByPath(const std::string &path, const Node *rootNode) {
         if (chunkItem->is<node::Custom>()) {
             chunkItem = chunkItem->as<node::Custom>().getDefinition().get();
         }
-        if (chunkItem && chunkItem->is<node::Record>()) {
+        if (chunkItem->is<node::Record>()) {
             for( auto &n : chunkItem->as<node::Record>().getChildren()) {
                 if (n->getItemName() == *p) {
                     chunkItem = n.get();
