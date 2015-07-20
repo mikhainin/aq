@@ -13,6 +13,15 @@ if (NOT APPLE)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
 endif()
 
+# get version from changelog
+
+file(STRINGS ${PROJECT_SOURCE_DIR}/../debian/changelog LOGLINE LIMIT_COUNT 1)
+
+string(REGEX MATCH "\\(.*\\)" VERSION ${LOGLINE})
+string(REGEX REPLACE "[()]" "" VERSION ${VERSION})
+set_source_files_properties(version.cc PROPERTIES COMPILE_FLAGS -DVERSION='"${VERSION}"')
+
+
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pedantic -Wall -Werror -ggdb3 -gdwarf-2")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pedantic -Wall -Werror -g -O3 ")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto ")
@@ -33,6 +42,7 @@ add_executable(aq
     main.cc
     fileemitor.cc
     worker.cc
+    version.cc
     )
 
 target_link_libraries (aq avro filter ${Boost_LIBRARIES} z)

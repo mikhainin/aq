@@ -7,10 +7,10 @@
 
 #include <boost/program_options.hpp>
 
-#include "filter/filter.h"
 #include "filter/compiler.h"
 
 #include "fileemitor.h"
+#include "version.h"
 #include "worker.h"
 namespace po = boost::program_options;
 
@@ -71,21 +71,23 @@ int main(int argc, const char * argv[]) {
     bool printProcessingFile = false;
     bool countMode = false;
     bool disableParseLoop = false;
+    bool displayVersionAndExit = false;
     std::string fieldSeparator = "\t";
 
     po::options_description desc("Allowed options");
     desc.add_options()
-        ("help,h", "Show help message")
-        ("input-file,f", po::value< std::vector<std::string> >(), "input files")
-        ("condition,c", po::value< std::string >(&condition), "expression")
-        ("limit,n", po::value< int >(&limit)->default_value(-1), "maximum number of records (default -1 means no limit)")
-        ("fields,l", po::value< std::string >(&fields), "fields to output")
+        ("input-file,f", po::value< std::vector<std::string> >(), "Input files")
+        ("condition,c", po::value< std::string >(&condition), "Expression")
+        ("limit,n", po::value< int >(&limit)->default_value(-1), "Maximum number of records (default -1 means no limit)")
+        ("fields,l", po::value< std::string >(&fields), "Fields to output")
         ("print-file", po::bool_switch(&printProcessingFile), "Print name of processing file")
         ("jobs,j", po::value< u_int >(&jobs), "Number of threads to run")
         ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
         ("record-separator", po::value<std::string>(&recordSeparator)->default_value("\\n"), "Record separator (\\n by default)")
         ("field-separator", po::value<std::string>(&fieldSeparator)->default_value("\\t"), "Field separator for TSV output (\\t by default)")
         ("disable-parse-loop", po::bool_switch(&disableParseLoop), "Disable experimental parsing mode (enabled by default)")
+        ("help,h", "Show help message")
+        ("version", po::bool_switch(&displayVersionAndExit), "Display version and exit")
     ;
 
     po::positional_options_description p;
@@ -101,8 +103,12 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     if (vm.count("help")) {
-        std::cout << desc << "\n";
-        return 1;
+        std::cout << desc << std::endl;
+        return 0;
+    }
+    if (displayVersionAndExit) {
+        std::cout << "aq version: " << avroqVersion() << std::endl;
+        return 0;
     }
 
     updateSeparator(recordSeparator);
