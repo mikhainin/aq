@@ -268,7 +268,7 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
         block.buffer.startDocument();
         //std::cout << i << " out of << " << block.objectCount << std::endl;
         if (parseLoopEnabled) {
-            for(int i = 0; i < parseLoop.size(); ) {
+            for(size_t i = 0; i < parseLoop.size(); ) {
                 i += parseLoop[i](block.buffer);
             }
         } else {
@@ -297,7 +297,7 @@ void BlockDecoder::dumpDocument(Block &block) {
     if (tsvFieldsList.pos > 0) {
         dumper::Tsv dumper(tsvFieldsList);
         if (parseLoopEnabled) {
-            for(int i = 0; i < tsvDumpLoop.size(); ) {
+            for(size_t i = 0; i < tsvDumpLoop.size(); ) {
                 i += tsvDumpLoop[i](block.buffer, dumper);
             }
         } else {
@@ -732,21 +732,11 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
 
         const auto &u = schema->as<node::Union>();
 
-        size_t nullIndex = -1; // u.nullIndex();
-
-        auto size = u.getChildren().size();
-
         auto &children = u.getChildren();
-        int i = size;
 
         int elementsLeft = elementsToSkip;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
-            --i;
-            auto &p = *c;
-            if (p->is<node::Null>()) {
-                nullIndex = i;
-            }
-            elementsLeft += compileTsvExpression(parse_items, p, elementsLeft);
+            elementsLeft += compileTsvExpression(parse_items, *c, elementsLeft);
         }
 
         auto it = parse_items.begin();
