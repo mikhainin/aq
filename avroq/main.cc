@@ -66,7 +66,7 @@ int main(int argc, const char * argv[]) {
 
     std::string condition;
     int limit = -1;
-    u_int jobs = 4;
+    u_int jobs = 1;
     std::string fields;
     bool printProcessingFile = false;
     bool countMode = false;
