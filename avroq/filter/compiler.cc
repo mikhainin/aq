@@ -27,9 +27,11 @@ namespace client
     ///////////////////////////////////////////////////////////////////////////
     struct ast_print
     {
+    	using nil = qi::info::nil_;
+
         typedef void result_type;
 
-        void operator()(qi::info::nil) const {}
+        void operator()(qi::info::nil_) const {}
         void operator()(int n) const { std::cout << n; }
         void operator()(bool b) const { std::cout << (b ? "true" : "false"); }
         void operator()(const std::string &s) const { std::cout << s; }

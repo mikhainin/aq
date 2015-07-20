@@ -17,7 +17,7 @@ struct ExpressionExtractor
     ExpressionExtractor(Filter &filter) : filter(filter){
     }
 
-    void operator()(qi::info::nil) const {}
+    void operator()(qi::info::nil_) const {}
     void operator()(int n) const { std::cout << n; }
     void operator()(const std::string &s) const { std::cout << s; }
     void operator()(equality_expression &s) const {
@@ -48,7 +48,7 @@ struct AstRunner
     AstRunner() {
     }
 
-    bool operator()(qi::info::nil) const { return false; }
+    bool operator()(qi::info::nil_) const { return false; }
     bool operator()(int n) const { assert(false); return false; }
     bool operator()(const std::string &s) const { assert(false); return false; }
     bool operator()(const nil &) const { assert(false); return false; }
@@ -83,7 +83,7 @@ struct ExpressionResetter
     ExpressionResetter() {
     }
 
-    void operator()(qi::info::nil) const {}
+    void operator()(qi::info::nil_) const {}
     void operator()(int ) const { }
     void operator()(const std::string &) const {  }
     void operator()(equality_expression &s) const {
