@@ -147,6 +147,23 @@ void Reader::dumpSchema(const std::unique_ptr<node::Node> &schema, int level) co
     }
 }
 
+const node::Node *notArrayNorMap(
+        const node::Node *node,
+        const std::string &path) {
+
+    if (node->isOneOf<node::Array, node::Map>()) {
+        throw std::runtime_error(
+            "Sorry, but type '" + node->getTypeName() +
+            "' for field '" + path + "' "
+            "Is not yet supported in tsv expression.");
+
+    } else if (node->is<node::Custom>()) {
+        auto &p = node->as<node::Custom>().getDefinition();
+        return notArrayNorMap(p.get(), path);
+    }
+    return node;
+}
+
 dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, const header &header, const std::string &fieldSeparator) {
 
     std::vector<std::string> fields;
@@ -167,11 +184,11 @@ dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, co
             node = node->as<node::Custom>().getDefinition().get();
         }
 
-        result.what[node->getNumber()] = result.pos;
+        result.what[notArrayNorMap(node, *p)->getNumber()] = result.pos;
         if (node->is<node::Union>()) {
-        	for( auto &p : node->as<node::Union>().getChildren()) {
-        		result.what[p->getNumber()] = result.pos;
-        	}
+            for( auto &n : node->as<node::Union>().getChildren()) {
+                result.what[notArrayNorMap(n.get(), *p)->getNumber()] = result.pos;
+            }
         }
         result.pos++;
     }
