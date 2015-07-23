@@ -7,6 +7,7 @@
 
 #include <avro/node/all_nodes.h>
 #include <avro/blockdecoder.h>
+#include <avro/exception.h>
 #include <avro/header.h>
 #include <avro/reader.h>
 
@@ -116,6 +117,10 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                             new filter::Filter(*filter)
                         )
                     );
+            } catch (const avro::PathNotFound &e) {
+                std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
+                    << "path '" << e.getPath() << "' was not found" << std::endl;
+                stop = true;
             } catch (const std::runtime_error &e) {
                 std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
                     << e.what() << std::endl;
