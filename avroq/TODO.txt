@@ -2,7 +2,7 @@ v0.1
 ====
 man page
 bash completion
-
+default threads number to --help message
 
 TODO
 ====
