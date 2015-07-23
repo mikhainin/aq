@@ -24,18 +24,18 @@ namespace avro {
 class Reader::Private {
 public:
 
-    std::unique_ptr<StringBuffer> input;
-
     FileHandle file;
 
-    Private(const std::string& filename) : file(filename) {
+    std::unique_ptr<StringBuffer> input;
+
+    Private(const std::string& filename)
+        : file(filename),
+          input(file.mmapFile()) {
     }
 };
 
 Reader::Reader(const std::string& filename) :
     d(new Private(filename)) {
-
-    d->input = d->file.mmapFile();
 }
 
 Reader::~Reader() {
