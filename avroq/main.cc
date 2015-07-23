@@ -81,7 +81,7 @@ int main(int argc, const char * argv[]) {
         ("limit,n", po::value< int >(&limit)->default_value(-1), "Maximum number of records (default -1 means no limit)")
         ("fields,l", po::value< std::string >(&fields), "Fields to output")
         ("print-file", po::bool_switch(&printProcessingFile), "Print name of processing file")
-        ("jobs,j", po::value< u_int >(&jobs), "Number of threads to run")
+        ("jobs,j", po::value< u_int >(&jobs)->default_value(1), "Number of threads to run")
         ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
         ("record-separator", po::value<std::string>(&recordSeparator)->default_value("\\n"), "Record separator (\\n by default)")
         ("field-separator", po::value<std::string>(&fieldSeparator)->default_value("\\t"), "Field separator for TSV output (\\t by default)")
@@ -100,6 +100,7 @@ int main(int argc, const char * argv[]) {
         po::notify(vm);
     } catch(const boost::program_options::error &e) {
         std::cerr << "Sorry, I couldn't parse arguments: " << e.what() << std::endl;
+        std::cerr << "Try --help" << std::endl;
         return 1;
     }
     if (vm.count("help")) {
