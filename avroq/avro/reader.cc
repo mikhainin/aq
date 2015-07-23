@@ -1,20 +1,19 @@
 
 #include <stdexcept>
 #include <iostream>
-#include <unordered_map>
 
 #include <boost/algorithm/string.hpp>
 
 #include "node/all_nodes.h"
 #include "node/nodebypath.h"
 
-#include "block.h"
 #include "exception.h"
 #include "filehandler.h"
-#include "reader.h"
 #include "schemareader.h"
 #include "stringbuffer.h"
 #include "zigzag.hpp"
+
+#include "reader.h"
 
 namespace {
     const std::string AVRO_MAGICK = "Obj\001"; // 4 bytes
@@ -73,7 +72,7 @@ header Reader::readHeader() {
     SchemaReader schemaReader(header.metadata["avro.schema"]);
     header.schema = schemaReader.parse();
     header.nodesNumber = schemaReader.nodesNumber();
-    //dumpSchema(schemaRoot);
+    // dumpSchema(header.schema);
     
     char c = d->input->getChar();
 
