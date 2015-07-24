@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "node/all_nodes.h"
 #include "node/nodebypath.h"
@@ -17,6 +18,7 @@
 
 namespace {
     const std::string AVRO_MAGICK = "Obj\001"; // 4 bytes
+    const size_t SYNC_LENGTH = 16;
 }
 
 namespace avro {
@@ -56,7 +58,6 @@ header Reader::readHeader() {
 
     header header;
 
-
     int64_t recordsNumber = readZigZagLong(*d->input);
     
     for(uint i = 0; i < recordsNumber; ++i) {
@@ -89,9 +90,15 @@ avro::StringBuffer Reader::nextBlock(const header &header, int64_t &objectCountI
     objectCountInBlock = readZigZagLong(*d->input);
     int64_t blockBytesNum = readZigZagLong(*d->input);
 
+    if (blockBytesNum + SYNC_LENGTH > d->input->bytesLeft()) {
+        throw std::runtime_error("Corrupted file: next block supposed to have " +
+            boost::lexical_cast<std::string>(blockBytesNum) + " bytes, but left: " +
+            boost::lexical_cast<std::string>(d->input->bytesLeft()));
+    }
+
     avro::StringBuffer result(d->input->getAndSkip(blockBytesNum), blockBytesNum);
 
-    char tmp_sync[16] = {0}; // TODO sync length to a constant
+    char tmp_sync[SYNC_LENGTH] = {0};
     d->input->read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
 
     if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
