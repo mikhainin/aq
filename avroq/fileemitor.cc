@@ -80,15 +80,25 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 new avro::header(currentTaskSample.reader->readHeader())
             );
 
-        currentTaskSample.tsvFieldsList.reset(
-                new avro::dumper::TsvExpression(
-                    currentTaskSample.reader->compileFieldsList(
-                            tsvFieldList,
-                            *currentTaskSample.header,
-                            fieldSeparator
-                        )
-                )
-            );
+        try {
+            currentTaskSample.tsvFieldsList.reset(
+                    new avro::dumper::TsvExpression(
+                        currentTaskSample.reader->compileFieldsList(
+                                tsvFieldList,
+                                *currentTaskSample.header,
+                                fieldSeparator
+                            )
+                    )
+                );
+            } catch (const avro::PathNotFound &e) {
+                std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
+                    << "path '" << e.getPath() << "' was not found" << std::endl;
+                stop = true;
+            } catch (const std::runtime_error &e) {
+                std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
+                    << e.what() << std::endl;
+                stop = true;
+            }
 
 
         ++currentFile;
@@ -127,7 +137,17 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 stop = true;
             }
         }
-        decoder->setTsvFilterExpression(*task->tsvFieldsList);
+        try {
+            decoder->setTsvFilterExpression(*task->tsvFieldsList);
+        } catch (const avro::PathNotFound &e) {
+            std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
+                << "path '" << e.getPath() << "' was not found" << std::endl;
+            stop = true;
+        } catch (const std::runtime_error &e) {
+            std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
+                << e.what() << std::endl;
+            stop = true;
+        }
 
         decoder->setDumpMethod(outDocument);
 
