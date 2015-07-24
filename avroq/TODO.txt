@@ -2,7 +2,8 @@ v0.1
 ====
 man page
 bash completion
-default threads number to --help message
+allow spaces in TSV expression
+[bug] limit doesn't work in many-threaded mode
 
 TODO
 ====
