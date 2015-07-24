@@ -1,3 +1,10 @@
+aq (0.1.0-beta3) unstable; urgency=low
+
+    Minor erro handling fixes
+    Improver --help output
+
+ -- Mikhail Galanin <mikhail.galanin@yahoo.com>  Fri, Jul 24 08:59:54 2015 +0300
+
 aq (0.1.0-beta2) unstable; urgency=low
 
   * 0.1.0-beta2
