@@ -1,6 +1,13 @@
+aq (0.1.0-beta4) unstable; urgency=low
+
+    Fixed access to non-existed path in TSV expression
+
+ -- Mikhail Galanin <mikhail.galanin@yahoo.com>  Fri, 24 Jul 2015 12:15:54 +0300
+
 aq (0.1.0-beta3) unstable; urgency=low
 
-    Minor erro handling fixes
+
+    Minor error handling fixes
     Improver --help output
 
  -- Mikhail Galanin <mikhail.galanin@yahoo.com>  Fri, 24 Jul 2015 08:59:54 +0300
