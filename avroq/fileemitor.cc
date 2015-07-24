@@ -94,10 +94,12 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
                     << "path '" << e.getPath() << "' was not found" << std::endl;
                 stop = true;
+                return std::shared_ptr<Task>();
             } catch (const std::runtime_error &e) {
                 std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
                     << e.what() << std::endl;
                 stop = true;
+                return std::shared_ptr<Task>();
             }
 
 
@@ -131,10 +133,12 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
                     << "path '" << e.getPath() << "' was not found" << std::endl;
                 stop = true;
+                return std::shared_ptr<Task>();
             } catch (const std::runtime_error &e) {
                 std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
                     << e.what() << std::endl;
                 stop = true;
+                return std::shared_ptr<Task>();
             }
         }
         try {
@@ -143,10 +147,12 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
             std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
                 << "path '" << e.getPath() << "' was not found" << std::endl;
             stop = true;
+            return std::shared_ptr<Task>();
         } catch (const std::runtime_error &e) {
             std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
                 << e.what() << std::endl;
             stop = true;
+            return std::shared_ptr<Task>();
         }
 
         decoder->setDumpMethod(outDocument);
