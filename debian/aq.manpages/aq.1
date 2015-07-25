@@ -1,0 +1,106 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH AQ 1 "JULY 2015" Aq "User Manuals"
+.SH NAME
+aq \- avro files read & grep tool
+.SH SYNOPSIS
+.B aq [ -c 
+.I filter expression
+.B ]
+.B [ -n
+.I limit
+.B ]
+.B [ -l
+.I tsv expression
+.B ]
+.B [ -j
+.I n
+.B ]
+.I input files
+.B ...
+.SH DESCRIPTION
+.B aq
+is a simple avro grep tool
+.SH OPTIONS
+.IP "-c, --condition FILTER EXPRESSION"
+Filter criteria. See 
+.I FILTER EXPRESSION
+section.
+
+.IP "-n, --limit LIMIT"
+Stop when 
+.I LIMIT
+is reached.
+.B aq
+will not wait if input contains less matches than 
+.I LIMIT
+
+.IP "-l, --fields TSV EXPRESSION"
+Comma-separated list of fields to print. Implies output in TSV format.
+Field separator could be changed via
+.B --field-separator
+parameter.
+
+.IP "-j, --jobs N"
+Threads number. Default value: 1, max value: 10. In threaded mode records order is not preserved.
+
+.IP "--count-only"
+Count matched records, don't print them.
+
+.IP --print-file
+Print processing file. In threaded mode several files could be processed simultaneously.
+
+.IP "--record-separator SEP"
+Use 
+.I SEP
+as records separator. "\\n" used by default
+
+.IP "--field-separator SEP"
+Use 
+.I SEP
+as fields separator in 
+.I TSV EXPRESSION.
+"\\t" used by default. Ignored without 
+.B --fields
+parameter.
+
+
+.IP --disable-parse-loop
+Disable experimental parsing mode (enabled by default).
+
+.IP "-h, --help"
+Show help message and exit.
+
+.IP --version
+Display version and exit.
+
+.SH FILTER EXPRESSION
+
+.B Supported types in filtering expression:
+boolean, double, enum, float, int, long, string, null (nil)
+
+.B Not yet supported for filtering:
+array, map, record
+
+Supported operators: <, >, ==, ~=, >=, <=, and, or
+
+Supported string functions: contains(), starts_with(), ends_with()
+
+
+
+.SH EXAMPLES
+
+$ aq bid_all.avro -l ad_exchange,domain -c 'ad_exchange:contains("x") and ad_exchange:starts_with("bsw_")
+
+$ aq -n1 raw.avro
+
+$ aq -c 'impression_id == "49b3fc90-0db0-4396-8a2c-45a110e767b3"' *.avro
+
+$ aq -c 'timers.budget_time ~= nil' raw.avro
+
+$ aq -c 'timers.budget_time > 0.001' raw.avro --count-only -j3
+
+.SH AUTHOR
+Mikhail Galanin <mikhail.galanin@yahoo.com>, <mgalanin@iponweb.net>
+

@@ -1,5 +1,5 @@
 v0.1
-man page
+====
 print path to corrupted file
 
 TODO
