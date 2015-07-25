@@ -277,9 +277,10 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
 
         if (!filter || filter->expressionPassed()) {
 
+            limit.documentFinished();
+
             dumpDocument(block);
 
-            limit.documentFinished();
             if(filter) {
                 filter->resetState();
             }
