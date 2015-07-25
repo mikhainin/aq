@@ -668,55 +668,87 @@ void BlockDecoder::skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_ite
 template<typename T>
 class ApplyTsv {
 public:
-    ApplyTsv(int ret, int position)
+    ApplyTsv(int ret,
+             dumper::TsvExpression::map_t::iterator start,
+             dumper::TsvExpression::map_t::iterator end)
         : ret(ret),
-          position(position) {
+          start(start),
+          end(end) {
     }
     int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
         const auto &value = TypeParser<T>::read(stream);
-        tsv.addToPosition(value, position);
+        // tsv.addToPosition(value, position);
+        for_each (
+            start, end,
+            [&value, &tsv, this](const auto& tsvItem){
+                tsv.addToPosition(value, tsvItem.second);
+            }
+        );
         return ret;
     }
 private:
     int ret;
-    int position;
+    dumper::TsvExpression::map_t::iterator start;
+    dumper::TsvExpression::map_t::iterator end;
 };
 
 
 class ApplyTsvNull {
 public:
-    ApplyTsvNull(int ret, int position)
+    ApplyTsvNull(int ret,
+                 dumper::TsvExpression::map_t::iterator start,
+                 dumper::TsvExpression::map_t::iterator end)
         : ret(ret),
-          position(position) {
+          start(start),
+          end(end) {
     }
     int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
-        tsv.addToPosition(stringifyedNull, position);
+        for_each (
+            start, end,
+            [&tsv, this](const auto& tsvItem){
+                tsv.addToPosition(stringifyedNull, tsvItem.second);
+            }
+        );
         return ret;
     }
 private:
-    const std::string stringifyedNull = "null";
     int ret;
-    int position;
+    const std::string stringifyedNull = "null";
+    dumper::TsvExpression::map_t::iterator start;
+    dumper::TsvExpression::map_t::iterator end;
 };
 
 class ApplyTsvEnum {
 public:
-    ApplyTsvEnum(int ret, int position, const std::vector<std::string> &items)
+    ApplyTsvEnum(int ret,
+                 dumper::TsvExpression::map_t::iterator start,
+                 dumper::TsvExpression::map_t::iterator end,
+                 const std::vector<std::string> &items)
         : ret(ret),
-          position(position),
+          start(start),
+          end(end),
           items(items) {
     }
     int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
         int item = TypeParser<int>::read(stream);
-        tsv.addToPosition(items[item], position);
+
+        for_each (
+            start, end,
+            [&item, &tsv, this](const auto& tsvItem){
+                tsv.addToPosition(items[item], tsvItem.second);
+            }
+        );
+
         return ret;
     }
 private:
     const std::string stringifyedNull = "null";
     int ret;
-    int position;
+    dumper::TsvExpression::map_t::iterator start;
+    dumper::TsvExpression::map_t::iterator end;
     const std::vector<std::string> items;
 };
+
 class SkipTsvEnum {
 public:
     SkipTsvEnum(int ret, const std::vector<std::string> &items)
@@ -829,9 +861,9 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
 template <typename SkipType, typename ApplyType, typename... Args>
 void BlockDecoder::skipOrApplyTsvExpression(std::vector<dump_tsv_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
     auto it = parse_items.begin();
-    auto p = tsvFieldsList.what.find(schema->getNumber());
-    if (p != tsvFieldsList.what.end()) {
-        parse_items.emplace(it, ApplyType(ret, p->second, args...));
+    auto p = tsvFieldsList.what.equal_range(schema->getNumber());
+    if (p.first != p.second) {
+        parse_items.emplace(it, ApplyType(ret, p.first, p.second, args...));
         return;
     }
     parse_items.emplace(it, SkipType(ret, args...));

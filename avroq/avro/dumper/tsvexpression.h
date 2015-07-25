@@ -7,7 +7,8 @@ namespace avro {
 namespace dumper {
 
 struct TsvExpression {
-    std::unordered_map<int, int> what;
+    using map_t = std::unordered_multimap<int, int>;
+    map_t what;
     int pos = 0;
     std::string fieldSeparator;
 };

@@ -194,10 +194,13 @@ dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, co
             node = node->as<node::Custom>().getDefinition().get();
         }
 
-        result.what[notArrayNorMap(node, *p)->getNumber()] = result.pos;
+        result.what.insert(std::make_pair(
+            notArrayNorMap(node, *p)->getNumber(), result.pos));
+
         if (node->is<node::Union>()) {
             for( auto &n : node->as<node::Union>().getChildren()) {
-                result.what[notArrayNorMap(n.get(), *p)->getNumber()] = result.pos;
+                result.what.insert(
+                    std::make_pair(notArrayNorMap(n.get(), *p)->getNumber(), result.pos));
             }
         }
         result.pos++;

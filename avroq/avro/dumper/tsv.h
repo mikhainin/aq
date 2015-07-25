@@ -55,9 +55,14 @@ public:
 
     template<typename T, typename NodeType>
     void addIfNecessary(const T &t, const NodeType &n) {
-    	auto p = whatDump.what.find(n.getNumber());
-    	if (p != whatDump.what.end()) {
-            toDump[p->second].reset(new TDumper<T>(t));
+        auto range = whatDump.what.equal_range(n.getNumber());
+        if (range.first != range.second) {
+            for_each (
+                range.first, range.second,
+                [&t, this](const auto &item){
+                    toDump[item.second].reset(new TDumper<T>(t));
+                }
+            );
     	}
     }
 
