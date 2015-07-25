@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH AQ 1 "JULY 2015" Aq "User Manuals"
+.TH AQ 1 "JULY 2015" aq "User Manuals"
 .SH NAME
 aq \- avro files read & grep tool
 .SH SYNOPSIS
@@ -77,15 +77,15 @@ Display version and exit.
 
 .SH FILTER EXPRESSION
 
-.B Supported types in filtering expression:
+Supported types in filtering expression:
 boolean, double, enum, float, int, long, string, null (nil)
 
 .B Not yet supported for filtering:
 array, map, record
 
-Supported operators: <, >, ==, ~=, >=, <=, and, or
+Operators: <, >, ==, ~=, >=, <=, and, or
 
-Supported string functions: contains(), starts_with(), ends_with()
+String functions: contains(), starts_with(), ends_with()
 
 
 
@@ -100,6 +100,8 @@ $ aq -c 'impression_id == "49b3fc90-0db0-4396-8a2c-45a110e767b3"' *.avro
 $ aq -c 'timers.budget_time ~= nil' raw.avro
 
 $ aq -c 'timers.budget_time > 0.001' raw.avro --count-only -j3
+
+$ aq -n1 ~/iponweb/imp.6F0B8.avro  -c 'random_guaranteed == false or landing_page_domain == nil'
 
 .SH AUTHOR
 Mikhail Galanin <mikhail.galanin@yahoo.com>, <mgalanin@iponweb.net>
