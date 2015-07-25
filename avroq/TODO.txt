@@ -4,6 +4,7 @@ man page
 bash completion
 allow spaces in TSV expression
 [bug] limit doesn't work in many-threaded mode
+print path to corrupted file
 
 TODO
 ====
