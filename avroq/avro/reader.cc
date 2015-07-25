@@ -77,7 +77,7 @@ header Reader::readHeader() {
     
     char c = d->input->getChar();
 
-    assert(c == 0); // TODO: what is it?
+    assert(c == 0); // Avro Map is over, no more elements
     d->input->read(&header.sync[0], sizeof header.sync);
 
 
@@ -157,7 +157,7 @@ const node::Node *notArrayNorMap(
         const node::Node *node,
         const std::string &path) {
 
-    if (node->isOneOf<node::Array, node::Map>()) {
+    if (node->isOneOf<node::Array, node::Map, node::Record>()) {
         throw std::runtime_error(
             "Sorry, but type '" + node->getTypeName() +
             "' for field '" + path + "' "
