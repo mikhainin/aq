@@ -184,6 +184,10 @@ dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, co
     }
 
     for(auto p = fields.begin(); p != fields.end(); ++p) {
+
+        // allow to insert spaces in TSV expression, ala " uuid, request.ip , request.uri "
+        boost::algorithm::trim(*p);
+
         auto node = schemaNodeByPath(*p, header);
 
         if (node->is<node::Custom>()) {
