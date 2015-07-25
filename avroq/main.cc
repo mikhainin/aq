@@ -163,6 +163,11 @@ int main(int argc, const char * argv[]) {
             std::cout << "Matched documents: " << emitor.getCountedDocuments() << std::endl;
         }
 
+        if (emitor.getLastError().size() > 0) {
+            std::cerr << emitor.getLastError() << std::endl;
+            return 1;
+        }
+
     } else {
         std::cerr << "No input files" << std::endl;
         return 1;
