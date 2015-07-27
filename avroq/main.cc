@@ -56,7 +56,7 @@ void correctJobsNumber(u_int &jobs) {
         jobs = 1;
     } else if (jobs > 10) {
         std::cerr << "hint: do not be so greedy. adjusing threads number to 10" << std::endl;
-        jobs = 1;
+        jobs = 10;
     }
 }
 
