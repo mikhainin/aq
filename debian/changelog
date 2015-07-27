@@ -1,3 +1,14 @@
+aq (0.1.0-beta5) unstable; urgency=low
+
+  Fixed working with too big block (corrupted file)
+  Fixed race condition in DicumentLimiter
+  Allow spaces in TSV expression
+  Allow to use the same path several times in TSV expression
+  Added autocomplete script
+  Added man page aq(1)
+
+ -- Mikhail Galanin <mikhail.galanin@yahoo.com>  Fri, 27 Jul 2015 09:52:58 +0300
+
 aq (0.1.0-beta4) unstable; urgency=low
 
     Fixed access to non-existed path in TSV expression
