@@ -52,10 +52,10 @@ void updateSeparator(std::string &sep) {
 
 void correctJobsNumber(u_int &jobs) {
     if (jobs < 1) {
-        std::cerr << "hint: adjusing threads number to 1" << std::endl;
+        std::cerr << "hint: adjusting threads number to 1" << std::endl;
         jobs = 1;
     } else if (jobs > 10) {
-        std::cerr << "hint: do not be so greedy. adjusing threads number to 10" << std::endl;
+        std::cerr << "hint: do not be so greedy. adjusting threads number to 10" << std::endl;
         jobs = 10;
     }
 }
