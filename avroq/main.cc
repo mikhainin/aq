@@ -54,9 +54,9 @@ void correctJobsNumber(u_int &jobs) {
     if (jobs < 1) {
         std::cerr << "hint: adjusting threads number to 1" << std::endl;
         jobs = 1;
-    } else if (jobs > 10) {
-        std::cerr << "hint: do not be so greedy. adjusting threads number to 10" << std::endl;
-        jobs = 10;
+    } else if (jobs > 16) {
+        std::cerr << "hint: do not be so greedy. adjusting threads number to 16" << std::endl;
+        jobs = 16;
     }
 }
 
@@ -161,6 +161,11 @@ int main(int argc, const char * argv[]) {
 
         if (countMode) {
             std::cout << "Matched documents: " << emitor.getCountedDocuments() << std::endl;
+        }
+
+        if (emitor.getLastError().size() > 0) {
+            std::cerr << emitor.getLastError() << std::endl;
+            return 1;
         }
 
     } else {

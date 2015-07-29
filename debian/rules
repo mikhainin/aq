@@ -10,7 +10,7 @@
 #export DH_VERBOSE=1
 
 %:
-	dh $@ 
+	dh $@ --with bash-completion
 
 override_dh_auto_build:
 	mkdir -p build
@@ -19,16 +19,11 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/aq
+	dh_installman
+	dh_bash-completion
 	mkdir -p $(CURDIR)/debian/aq/usr/bin/
-	
-	#objcopy --only-keep-debug $(CURDIR)/build/aq $(CURDIR)/build/aq.debug
-	#strip -g $(CURDIR)/build/aq
-	#objcopy --add-gnu-debuglink=$(CURDIR)/build/aq.debug $(CURDIR)/build/aq
 
 	install $(CURDIR)/build/aq $(CURDIR)/debian/aq/usr/bin/aq
-	
-	#mkdir -p $(CURDIR)/debian/aq-dbg/usr/bin/
-	#install $(CURDIR)/build/aq.debug $(CURDIR)/debian/aq-dbg/usr/bin/aq.debug
 
 override_dh_installdocs:
 	dh_installdocs --link-doc=aq
