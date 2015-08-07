@@ -16,6 +16,7 @@ don't recreate header.schema, filter expression, tsv expression if schema is not
 print column names in tsv-mode
 remove ":" when printing arrays
 field.* notation
+add \n, \r, \t etc to string literals
 
 Long term TODO
 ==============
