@@ -83,8 +83,8 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
 
 
             quoted_string =
-                  lexeme['"' >> +(char_ - '"') >> '"']
-                | lexeme['\'' >> +(char_ - '\'') >> '\'']
+                  lexeme['"' >> *(char_ - '"') >> '"']
+                | lexeme['\'' >> *(char_ - '\'') >> '\'']
                 ;
 
             constant =
