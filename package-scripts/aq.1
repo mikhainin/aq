@@ -83,7 +83,7 @@ boolean, double, enum, float, int, long, string, null (nil)
 .B Not yet supported for filtering:
 array, map, record
 
-Supported operators: <, >, ==, ~=, >=, <=, and, or
+Supported operators: <, >, ==, ~=, >=, <=, and, or, not
 
 Supported string functions: contains(), starts_with(), ends_with()
 
@@ -91,7 +91,7 @@ Supported string functions: contains(), starts_with(), ends_with()
 
 .SH EXAMPLES
 
-$ aq bid_all.avro -l ad_exchange,domain -c 'ad_exchange:contains("x") and ad_exchange:starts_with("bsw_")
+$ aq bid_all.avro -l ad_exchange,domain -c 'ad_exchange:contains("x") and not ad_exchange:starts_with("bsw_")
 
 $ aq -n1 raw.avro
 
