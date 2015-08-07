@@ -91,15 +91,10 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                     )
                 );
             } catch (const avro::PathNotFound &e) {
-                std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
-                    << "path '" << e.getPath() << "' was not found" << std::endl;
-                stop = true;
-                return std::shared_ptr<Task>();
+                return returnStop("Can't apply TSV expression to file: " + currentFileName + "\n"
+                                  "path '" + e.getPath() + "' was not found");
             } catch (const std::runtime_error &e) {
-                std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
-                    << e.what() << std::endl;
-                stop = true;
-                return std::shared_ptr<Task>();
+                return returnStop("Can't apply TSV expression to file: " + currentFileName + "\n" + e.what());
             }
 
 
@@ -130,29 +125,19 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                         )
                     );
             } catch (const avro::PathNotFound &e) {
-                std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
-                    << "path '" << e.getPath() << "' was not found" << std::endl;
-                stop = true;
-                return std::shared_ptr<Task>();
+                return returnStop("Can't apply filter to file: " + currentFileName + "\n"
+                                  "path '" + e.getPath() + "' was not found");
             } catch (const std::runtime_error &e) {
-                std::cerr << "Can't apply filter to file: " << currentFileName << std::endl
-                    << e.what() << std::endl;
-                stop = true;
-                return std::shared_ptr<Task>();
+                return returnStop("Can't apply filter to file: " + currentFileName + e.what());
             }
         }
         try {
             decoder->setTsvFilterExpression(*task->tsvFieldsList);
         } catch (const avro::PathNotFound &e) {
-            std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
-                << "path '" << e.getPath() << "' was not found" << std::endl;
-            stop = true;
-            return std::shared_ptr<Task>();
+            return returnStop("Can't apply TSV expression to file: " + currentFileName + "\n"
+                              "path '" + e.getPath() + "' was not found");
         } catch (const std::runtime_error &e) {
-            std::cerr << "Can't apply TSV expression to file: " << currentFileName << std::endl
-                << e.what() << std::endl;
-            stop = true;
-            return std::shared_ptr<Task>();
+            return returnStop("Can't apply TSV expression to file: " + currentFileName + "\n" + e.what());
         }
 
         decoder->setDumpMethod(outDocument);
@@ -183,4 +168,14 @@ void FileEmitor::countDocument(size_t num) {
 
 size_t FileEmitor::getCountedDocuments() const {
     return countedDocuments;
+}
+
+std::shared_ptr<Task> FileEmitor::returnStop(const std::string &reason) {
+    lastError = reason;
+    stop = true;
+    return std::shared_ptr<Task>();
+}
+
+const std::string &FileEmitor::getLastError() const {
+    return lastError;
 }

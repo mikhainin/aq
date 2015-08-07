@@ -43,6 +43,8 @@ public:
     void setTsvFieldList(const std::string &tsvFieldList, const std::string &fieldSeparator);
 
     size_t getCountedDocuments() const;
+
+    const std::string &getLastError() const;
 private:
     const std::vector<std::string> &fileList;
     std::string fieldSeparator;
@@ -58,10 +60,13 @@ private:
     bool stop = false;
     bool countMode = false;
     bool parseLoopEnabled = false;
+    std::string lastError;
 
     bool canProduceNextTask();
 
     void countDocument(size_t num);
+
+    std::shared_ptr<Task> returnStop(const std::string &reason);
 };
 
 #endif
