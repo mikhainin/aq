@@ -12,9 +12,8 @@ tail mode
 progressbar
 don't create threads if file size is small
 don't recreate header.schema, filter expression, tsv expression if schema is not changed
-"less" mode, aq | less, that extracts only first block, or n elements and waits while user wants bome
+"less" mode, aq | less, that extracts only first block, or n elements and waits while user wants more
 print column names in tsv-mode
-"not" operator in filtering expression
 remove ":" when printing arrays
 field.* notation
 

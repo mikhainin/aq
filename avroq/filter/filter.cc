@@ -35,6 +35,10 @@ struct ExpressionExtractor
         boost::apply_visitor(*this, expr.left.expr);
         boost::apply_visitor(*this, expr.right.expr);
     }
+    void operator()(detail::not_op& expr) const
+    {
+        boost::apply_visitor(*this, expr.expr.expr);
+    }
 
     Filter &filter;
 };
@@ -72,6 +76,10 @@ struct AstRunner
                 boost::apply_visitor(*this, expr.right.expr);
         }
     }
+    bool operator()(detail::not_op const& expr) const
+    {
+        return !boost::apply_visitor(*this, expr.expr.expr);
+    }
 
 };
 
@@ -100,6 +108,10 @@ struct ExpressionResetter
     {
         boost::apply_visitor(*this, expr.left.expr);
         boost::apply_visitor(*this, expr.right.expr);
+    }
+    void operator()(detail::not_op& expr) const
+    {
+        boost::apply_visitor(*this, expr.expr.expr);
     }
 };
 

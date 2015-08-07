@@ -29,7 +29,7 @@ namespace ascii = boost::spirit::ascii;
 //  Our AST
 ///////////////////////////////////////////////////////////////////////////
 struct binary_op;
-//struct equality_expression;
+struct not_op;
 
 struct expression_ast
 {
@@ -41,6 +41,7 @@ struct expression_ast
           , boost::recursive_wrapper<equality_expression>
           , boost::recursive_wrapper<expression_ast>
           , boost::recursive_wrapper<binary_op>
+          , boost::recursive_wrapper<not_op>
         >
     type;
 
@@ -52,6 +53,8 @@ struct expression_ast
 
     expression_ast& operator &=(expression_ast const& rhs);
     expression_ast& operator |=(expression_ast const& rhs);
+
+    expression_ast& operator != (expression_ast const& expr);
 
     type expr;
 };
@@ -71,6 +74,14 @@ struct binary_op
     expression_ast left;
     expression_ast right;
 };
+
+struct not_op
+{
+	not_op(expression_ast const& expr);
+
+    expression_ast expr;
+};
+
 
 }
 }

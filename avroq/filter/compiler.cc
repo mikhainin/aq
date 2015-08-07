@@ -123,8 +123,9 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                 ;
 
             braces_expr =
-                  '(' >> logical_expression [_val = _1] >> ')'
-                | equality_expr             [_val = _1];
+                  '(' >> logical_expression   [_val = _1] >> ')'
+                | equality_expr               [_val = _1]
+                | lit("not") >> equality_expr [_val != _1];
 
             logical_expression =
                     braces_expr                 [_val = _1]
