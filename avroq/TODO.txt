@@ -17,6 +17,7 @@ print column names in tsv-mode
 "not" operator in filtering expression
 remove ":" when printing arrays
 field.* notation
+add \n, \r, \t etc to string literals
 
 Long term TODO
 ==============
