@@ -1,3 +1,9 @@
+aq (0.1.0-beta8) unstable; urgency=low
+
+  Ignore schema items "doc","default","order","aliases"
+
+ -- Mikhail Galanin <mikhail.galanin@yahoo.com>  Wed, 12 Aug 2015 15:01:37 +0300
+
 aq (0.1.0-beta7) unstable; urgency=low
 
   Added operator "not"
