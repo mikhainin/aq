@@ -1,3 +1,9 @@
+aq (0.1.0-r1) stable; urgency=low
+
+  0.1.0 stable
+
+ -- Mikhail Galanin <mikhail.galanin@yahoo.com>  Fri, 14 Aug 2015 09:14:03 +0300
+
 aq (0.1.0-beta8) unstable; urgency=low
 
   Ignore schema items "doc","default","order","aliases"
