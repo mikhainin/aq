@@ -1,3 +1,5 @@
+#define BOOST_SPIRIT_DEBUG
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -16,6 +18,55 @@
 #include "string_operator.h"
 
 namespace filter {
+    namespace detail {
+
+      struct push_esc
+      {
+         template <typename Sig>
+         struct result { typedef void type; };
+
+         void operator()(std::string& str, u_char c) const
+         {
+            switch (c)
+            {
+               case '"': str += '"';          break;
+               case '\'': str += '\'';         break;
+               case '\\': str += '\\';        break;
+               case '/': str += '/';          break;
+               case 'b': str += '\b';         break;
+               case 'f': str += '\f';         break;
+               case 'n': str += '\n';         break;
+               case 'r': str += '\r';         break;
+               case 't': str += '\t';         break;
+            }
+         }
+      };
+
+      struct push_utf8
+      {
+         template <typename Sig>
+         struct result { typedef void type; };
+
+         void operator()(std::string& utf8, u_char code_point) const
+         {
+            typedef std::back_insert_iterator<std::string> insert_iter;
+            insert_iter out_iter(utf8);
+            boost::utf8_output_iterator<insert_iter> utf8_iter(out_iter);
+            *utf8_iter++ = code_point;
+         }
+      };
+
+      struct push_hex
+      {
+         template <typename Sig>
+         struct result { typedef void type; };
+
+         void operator()(std::string& str, u_char c) const
+         {
+            str += c;
+         }
+      };
+   }
 
 namespace client
 {
@@ -57,11 +108,73 @@ namespace client
         }
     };
 
-/*
 
-creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local == true
+      template <typename Iterator>
+      struct quoted_string : qi::grammar<Iterator, std::string()>
+      {
+         quoted_string();
+         qi::rule<Iterator, void(std::string&)> escape;
+         qi::rule<Iterator, void(std::string&)> char_esc;
+         qi::rule<Iterator, std::string()> quoted;
+      };
 
-*/
+      template< typename Iterator >
+      quoted_string<Iterator>::quoted_string()
+         : quoted_string::base_type(quoted)
+      {
+         qi::char_type char_;
+         qi::_val_type _val;
+         qi::_r1_type _r1;
+         qi::_1_type _1;
+         qi::lit_type lit;
+         qi::repeat_type repeat;
+         qi::hex_type hex;
+         qi::standard::cntrl_type cntrl;
+
+         using boost::spirit::qi::uint_parser;
+         using boost::phoenix::function;
+
+         uint_parser<u_char, 16, 4, 4> hex4;
+         uint_parser<u_char, 16, 2, 2> hex2;
+         uint_parser<u_char, 8, 3, 3>  oct3;
+         function<detail::push_utf8> push_utf8;
+         function<detail::push_esc>  push_esc;
+         function<detail::push_hex>  push_hex;
+
+         escape =
+                ('u' > hex4)            [push_utf8(_r1, _1)]
+            |   ('x' > hex2)            [push_hex(_r1, _1)]
+            |   oct3                    [push_hex(_r1, _1)]
+            |   char_("'\"\\/bfnrt")    [push_esc(_r1, _1)]
+            ;
+
+         char_esc =
+            '\\' > escape(_r1)
+            ;
+
+         // a double quoted string containes 0 or more characters
+         // where a character is:
+         //     any-Unicode-character-except-"-or-\-or-control-character
+         //
+         quoted =
+                '"'
+                > *(  char_esc(_val)
+                    | (char_ - '"' - '\\' - cntrl)    [_val += _1]
+                   )
+                > '"'
+            |
+                  '\''
+                > *(  char_esc(_val)
+                    | (char_ - '\'' - '\\' - cntrl)    [_val += _1]
+                   )
+                > '\''
+            ;
+
+         BOOST_SPIRIT_DEBUG_NODE(escape);
+         BOOST_SPIRIT_DEBUG_NODE(char_esc);
+         BOOST_SPIRIT_DEBUG_NODE(quoted);
+      }
+
     ///////////////////////////////////////////////////////////////////////////
     //  Our calculator grammar
     ///////////////////////////////////////////////////////////////////////////
@@ -81,17 +194,11 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             using qi::lit;
             using ascii::char_;
 
-
-            quoted_string =
-                  lexeme['"' >> *(char_ - '"') >> '"']
-                | lexeme['\'' >> *(char_ - '\'') >> '\'']
-                ;
-
             constant =
                   double_           [_val = _1 ]
                 | bool_             [_val = _1 ]
                 | int_              [_val = _1 ]
-                | quoted_string     [_val = _1 ]
+                | quoted_string_    [_val = _1 ]
                 | lit("nil")        [_val = filter::nil()];
 
             identifier =
@@ -117,7 +224,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
                                 | lit(":starts_with(") [_val |= string_operator(string_operator::STARTS_WITH)]
                                 | lit(":ends_with(")   [_val |= string_operator(string_operator::ENDS_WITH)]
                             )
-                         >> quoted_string        [_val |= _1]
+                         >> quoted_string_        [_val |= _1]
                          >> ')'
                        )
                 ;
@@ -137,6 +244,11 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
             condition =
                   logical_expression                [_val = _1]
                 ;
+
+            //BOOST_SPIRIT_DEBUG_NODE(identifier);
+            BOOST_SPIRIT_DEBUG_NODE(array_expression);
+            //BOOST_SPIRIT_DEBUG_NODE(condition);
+            //BOOST_SPIRIT_DEBUG_NODE(braces_expr);
         }
 
         qi::rule<Iterator, detail::expression_ast(), ascii::space_type>
@@ -144,7 +256,7 @@ creative_id == 123 or (request.uri == "/bad" and r.lua_data =~ nil) or is_local 
 
         qi::rule<Iterator, equality_expression::type(), ascii::space_type> constant;
         qi::rule<Iterator, equality_expression(), ascii::space_type> equality_expr;
-        qi::rule<Iterator, std::string(), ascii::space_type> quoted_string;
+        quoted_string<Iterator> quoted_string_;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
     };
 
