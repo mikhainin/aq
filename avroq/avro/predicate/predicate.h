@@ -20,6 +20,8 @@ public:
     void apply(const T &sb);
 
     void setIsNull(bool isNull);
+
+    void pushArrayState();
 private:
     filter::equality_expression *expr;
 

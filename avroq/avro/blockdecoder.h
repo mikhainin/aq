@@ -29,6 +29,7 @@ namespace predicate {
 
 class BlockDecoder {
     friend class SkipArray;
+    friend class ApplyArray;
     friend class SkipMap;
     using parse_func_t = std::function<int(DeflatedBuffer &)>;
     using dump_tsv_func_t = std::function<int(DeflatedBuffer &, dumper::Tsv &t)>;

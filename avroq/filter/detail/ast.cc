@@ -36,6 +36,22 @@ binary_op::binary_op(
 not_op::not_op(expression_ast const& expr) : expr(expr) {
 }
 
+array_element::array_element() {
+}
+
+array_element::array_element(const std::string &identifier) :
+    identifier(identifier) {
+}
+
+array_element& array_element::operator |= (int i) {
+    index = i;
+    return *this;
+}
+
+std::ostream& operator<<(std::ostream& os, const array_element& s) {
+    os << s.identifier << '[' << s.index << ']';
+    return os;
+}
 
 } // namespace detail
 } // namespace filter

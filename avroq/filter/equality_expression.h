@@ -3,13 +3,16 @@
 #define __avroq__equality_expression__
 
 #include <string>
+#include <vector>
 #include <boost/variant.hpp>
 
 #include "nil.h"
 #include "string_operator.h"
 
 namespace filter {
-
+namespace detail {
+    struct array_element;
+}
     struct equality_expression
     {
         enum OP {
@@ -36,6 +39,7 @@ namespace filter {
         equality_expression();
 
         equality_expression(const std::string &ident);
+        equality_expression(const detail::array_element &ident);
 
         equality_expression& operator == (const type &constant);
 
@@ -53,6 +57,9 @@ namespace filter {
         std::string identifier;
         OP op;
         string_operator::ops_t strop;
+        bool is_array_element = false;
+        int array_index = 0;
+        std::vector<bool> array_states;
 
 
         /// state
@@ -61,6 +68,8 @@ namespace filter {
 
         void resetState();
         void setState(bool newState);
+        bool getState() const;
+        void pushState();
     };
 
 }

@@ -82,6 +82,23 @@ struct not_op
     expression_ast expr;
 };
 
+struct array_element {
+    enum {
+        ANY  = -1,
+        ALL  = -2,
+        NONE = -3
+    };
+
+    array_element();
+    array_element(const std::string &identifier);
+    array_element& operator |= (int i);
+
+    std::string identifier;
+    int index = 0;
+};
+
+std::ostream& operator<<(std::ostream& os, const array_element& s);
+
 
 }
 }

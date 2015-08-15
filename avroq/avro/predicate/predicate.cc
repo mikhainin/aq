@@ -1,3 +1,4 @@
+#include <iostream>
 
 #include <filter/equality_expression.h>
 
@@ -108,6 +109,12 @@ void Predicate::setIsNull(bool isNull) {
         assert(false && "setIsNull: expr->op contains unknown operator");
     }
 }
+
+void Predicate::pushArrayState() {
+    assert(expr->is_array_element && "Predicate::pushArrayState: called for non-array element");
+    expr->pushState();
+}
+
 
 }
 }

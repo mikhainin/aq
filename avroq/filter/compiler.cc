@@ -1,4 +1,4 @@
-#define BOOST_SPIRIT_DEBUG
+//#define BOOST_SPIRIT_DEBUG
 
 #include <iostream>
 #include <vector>
@@ -30,7 +30,7 @@ namespace filter {
             switch (c)
             {
                case '"': str += '"';          break;
-               case '\'': str += '\'';         break;
+               case '\'': str += '\'';        break;
                case '\\': str += '\\';        break;
                case '/': str += '/';          break;
                case 'b': str += '\b';         break;
@@ -206,18 +206,35 @@ namespace client
                 ;
 
 
-            equality_expr =
-                identifier                  [_val =  _1]
-                    >>  ( ("==" >> constant [_val == _1])
-                        | ("~=" >> constant [_val != _1])
-                        | ("<"  >> constant [_val <  _1])
-                        | (">"  >> constant [_val >  _1])
-                        | ("<=" >> constant [_val <= _1])
-                        | (">=" >> constant [_val >= _1])
-                        )
-                    |
+            array_expression =
+                identifier             [_val  =  _1]
+                    >>  '['
+                        >> ( int_        [_val |= _1]
+                           | lit("any")  [_val |= detail::array_element::ANY]
+                           | lit("all")  [_val |= detail::array_element::ALL]
+                           | lit("none") [_val |= detail::array_element::NONE]
+                           )
+                        >> ']'
 
-                identifier                       [_val = _1]
+
+                ;
+
+            equality_expr =
+                ( array_expression           [_val =  _1]
+                | identifier                 [_val =  _1]
+                )
+                    >>  ( ("==" >> constant        [_val == _1])
+                        | ("~=" >> constant        [_val != _1])
+                        | ("<"  >> constant        [_val <  _1])
+                        | (">"  >> constant        [_val >  _1])
+                        | ("<=" >> constant        [_val <= _1])
+                        | (">=" >> constant        [_val >= _1])
+                        )
+                |
+
+                ( array_expression           [_val =  _1]
+                | identifier                 [_val =  _1]
+                )
                     >> (
                             (
                                 lit(":contains(")      [_val |= string_operator(string_operator::CONTAINS)]
@@ -245,8 +262,8 @@ namespace client
                   logical_expression                [_val = _1]
                 ;
 
-            //BOOST_SPIRIT_DEBUG_NODE(identifier);
             BOOST_SPIRIT_DEBUG_NODE(array_expression);
+            BOOST_SPIRIT_DEBUG_NODE(identifier);
             //BOOST_SPIRIT_DEBUG_NODE(condition);
             //BOOST_SPIRIT_DEBUG_NODE(braces_expr);
         }
@@ -258,6 +275,8 @@ namespace client
         qi::rule<Iterator, equality_expression(), ascii::space_type> equality_expr;
         quoted_string<Iterator> quoted_string_;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
+        qi::rule<Iterator, detail::array_element(), ascii::space_type> array_expression;
+
     };
 
 }

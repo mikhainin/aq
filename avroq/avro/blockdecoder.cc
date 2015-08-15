@@ -155,13 +155,15 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                     filterNode = filterNode->as<node::Custom>().getDefinition().get();
                 }
                 if (filterNode->isOneOf<
+                            node::Array,
                             node::Boolean,
                             node::Double,
                             node::Enum,
                             node::Float,
                             node::Int,
                             node::Long,
-                            node::String>()) {
+                            node::String
+                            >()) {
                     break;
                 }
             }
@@ -172,6 +174,24 @@ void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
                 throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
             }
         }
+
+        if (filterNode->is<node::Array>()) {
+            // put predicate on both items: on array and on element
+            filterItems.insert(
+                    std::make_pair(
+                        filterNode,
+                        std::make_shared<predicate::Predicate>(filterPredicate)
+                    )
+                );
+
+            filterNode = filterNode->as<node::Array>().getItemsType().get();
+
+            if (filterNode->is<node::Union>()) {
+                throw std::runtime_error("Only arrays of primitive types are supported. "
+                 "Can't process field '" + filterPredicate->identifier + "'");
+            }
+        }
+
         if (filterNode->isOneOf<node::Union>()) {
             ; // ok, acceptable only for isnil/notnil operations
         } else if (filterNode->is<node::Enum>()) {
@@ -346,8 +366,21 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         int objectsInBlock = 0;
         do {
             objectsInBlock = TypeParser<int>::read(stream);
+
+            decltype(filterItems.equal_range(schema.get())) range;
+            if (filter) {
+                range = filterItems.equal_range(schema.get());
+            }
             for(int i = 0; i < objectsInBlock; ++i) {
                 decodeDocument(stream, node);
+                if (range.first != range.second) {
+                    for_each (
+                        range.first, range.second,
+                        [](const auto& filterItem){
+                            filterItem.second->pushArrayState();
+                        }
+                    );
+                }
             }
         } while(objectsInBlock != 0);
 
@@ -379,8 +412,8 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         } else if (schema->is<node::Null>()) {
             ; // empty value: no way to process
         } else {
-            std::cout << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
-            std::cout << "Can't read type: no decoder. Finishing." << std::endl;
+            std::cerr << schema->getItemName() << ":" << schema->getTypeName() << std::endl;
+            std::cerr << "Can't read type: no decoder. Finishing." << std::endl;
             throw Eof();
         }
     }
@@ -551,6 +584,51 @@ private:
     BlockDecoder &decoder;
 };
 
+
+class ApplyArray {
+public:
+
+    explicit ApplyArray(int ret,
+        BlockDecoder::filter_items_t::iterator start,
+        BlockDecoder::filter_items_t::iterator end,
+        BlockDecoder::const_node_t &schema,
+        BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        int objectsInBlock = 0;
+        do {
+            objectsInBlock = TypeParser<int>::read(stream);
+            for(int i = 0; i < objectsInBlock; ++i) {
+                decoder.decodeDocument(stream, nodeType);
+                for_each (
+                    start, end,
+                    [](const auto& filterItem){
+                        filterItem.second->pushArrayState();
+                    }
+                );
+            }
+        } while(objectsInBlock != 0);
+        return ret;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        return operator() (stream);
+    }
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+    BlockDecoder::filter_items_t::iterator start;
+    BlockDecoder::filter_items_t::iterator end;
+};
+
+
 class SkipMap {
 public:
     explicit SkipMap(int ret, BlockDecoder::const_node_t &schema, BlockDecoder &decoder)
@@ -618,7 +696,15 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
         }
         return size;
     } else if (schema->is<node::Array>()) {
+
             auto it = parse_items.begin();
+            if (filter) {
+                auto range = filterItems.equal_range(schema.get());
+                if (range.first != range.second) {
+                    parse_items.emplace(it, ApplyArray(elementsToSkip, range.first, range.second, schema->as<node::Array>().getItemsType(), *this));
+                    return 1;
+                }
+            }
             parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
             return 1;
     } else if (schema->is<node::Map>()) {

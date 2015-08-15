@@ -58,7 +58,7 @@ struct AstRunner
     bool operator()(const nil &) const { assert(false); return false; }
 
     bool operator()(const equality_expression &s) const {
-        return s.state;
+        return s.getState();
     }
 
     bool operator()(detail::expression_ast const& ast) const

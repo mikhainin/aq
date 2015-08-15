@@ -1,3 +1,5 @@
+#include <util/algorithm.h>
+#include "detail/ast.hpp"
 #include "equality_expression.h"
 
 
@@ -8,6 +10,12 @@ equality_expression::equality_expression() {
 
 equality_expression::equality_expression(const std::string &ident) :
     identifier(ident) {
+}
+
+equality_expression::equality_expression(const detail::array_element &ident) :
+    identifier(ident.identifier),
+    is_array_element(true),
+    array_index(ident.index) {
 }
 
 equality_expression& equality_expression::operator == (const type &constant) {
@@ -71,10 +79,40 @@ equality_expression& equality_expression::operator |= (const type &constant) {
 
 void equality_expression::resetState() {
     state = false;
+    array_states.clear();
 }
 
 void equality_expression::setState(bool newState) {
     state = newState;
+}
+
+
+bool equality_expression::getState() const {
+    if (!is_array_element) {
+        return state;
+    } else {
+        if (array_index == detail::array_element::ALL) {
+            return not util::algorithm::contains(
+                array_states.begin(), array_states.end(), false
+            );
+        } else if (array_index == detail::array_element::ANY) {
+            return util::algorithm::contains(
+                array_states.begin(), array_states.end(), true
+            );
+        } else if (array_index == detail::array_element::NONE) {
+            return not util::algorithm::contains(
+                array_states.begin(), array_states.end(), true
+            );
+        } else {
+            return array_states.size() > array_index &&
+                        array_states[array_index];
+        }
+    }
+}
+
+
+void equality_expression::pushState() {
+    array_states.push_back(state);
 }
 
 
