@@ -85,8 +85,16 @@ public:
             containsValues = true;
         } else if (name == "items") {
             containsItems = true;
+        } else if (name == "doc") {
+            ; // ignore
+        } else if (name == "default") {
+            ; // ignore
+        } else if (name == "order") {
+            ; // ignore
+        } else if (name == "aliases") {
+            ; // ignore
         } else {
-            throw std::runtime_error("NodeDescriptor::assignField: unknown schema record name - '" + name + "'");
+            throw std::runtime_error("NodeDescriptor::assignField: unknown schema item name - '" + name + "'");
         }
     }
 };
