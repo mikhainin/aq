@@ -2,6 +2,7 @@
 #include <boost/spirit/include/qi.hpp>
 
 #include "equality_expression.h"
+#include "record_expression.h"
 
 #include "filter.h"
 
@@ -22,6 +23,10 @@ struct ExpressionExtractor
     void operator()(const std::string &s) const { std::cout << s; }
     void operator()(equality_expression &s) const {
         filter.addExpression(s);
+    }
+    void operator()(record_expression &r) const {
+        //filter.addExpression(s);
+        // TODO: implement me
     }
 
     void operator()(const nil &) const {  }
@@ -66,6 +71,10 @@ struct AstRunner
         return boost::apply_visitor(*this, ast.expr);
     }
 
+    bool operator()(record_expression const& r) const {
+        return false; // TODO: implement me
+    }
+
     bool operator()(detail::binary_op const& expr) const
     {
         if (expr.op == detail::binary_op::AND) {
@@ -103,6 +112,9 @@ struct ExpressionResetter
     void operator()(detail::expression_ast& ast) const
     {
         boost::apply_visitor(*this, ast.expr);
+    }
+    void operator()(record_expression & r) const {
+        return; // TODO: implement me
     }
     void operator()(detail::binary_op& expr) const
     {

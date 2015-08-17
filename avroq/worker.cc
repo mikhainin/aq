@@ -1,4 +1,5 @@
 #include <memory>
+#include <iostream>
 
 #include <avro/block.h>
 #include <avro/blockdecoder.h>
@@ -8,6 +9,8 @@
 #include <avro/codec/create.h>
 
 #include <filter/filter.h>
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include "fileemitor.h"
 

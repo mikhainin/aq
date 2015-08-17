@@ -1,5 +1,7 @@
 
 #include <filter/filter.h>
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include "dumper/tsv.h"
 #include "dumper/fool.h"

@@ -12,6 +12,8 @@
 #include <avro/reader.h>
 
 #include <filter/filter.h>
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include "fileemitor.h"
 
