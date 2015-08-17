@@ -83,10 +83,10 @@ struct not_op
 };
 
 struct array_element {
-    enum {
-        ANY  = -1,
-        ALL  = -2,
-        NONE = -3
+    enum : size_t {
+        ANY  = static_cast<size_t>(-1),
+        ALL  = static_cast<size_t>(-2),
+        NONE = static_cast<size_t>(-3)
     };
 
     array_element();
