@@ -5,6 +5,8 @@
 #include <unordered_map>
 
 #include "dumper/tsvexpression.h"
+#include "predicate/list.h"
+
 
 namespace filter {
     class Filter;
@@ -25,6 +27,7 @@ namespace node {
 }
 namespace predicate {
     class Predicate;
+    class List;
 }
 
 class BlockDecoder {
@@ -34,7 +37,6 @@ class BlockDecoder {
     using parse_func_t = std::function<int(DeflatedBuffer &)>;
     using dump_tsv_func_t = std::function<int(DeflatedBuffer &, dumper::Tsv &t)>;
 public:
-    using filter_items_t = std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>>;
     using const_node_t = const std::unique_ptr<node::Node>;
 
     BlockDecoder(const struct header &header, Limiter &limit);
@@ -52,7 +54,8 @@ private:
     Limiter &limit;
     dumper::TsvExpression tsvFieldsList;
     std::unique_ptr<filter::Filter> filter;
-    filter_items_t filterItems;
+    std::unique_ptr<predicate::List> predicates;
+
     std::function<void(const std::string &)> dumpMethod;
     std::function<void(size_t)> coutMethod;
     bool countOnly = false;
