@@ -149,6 +149,8 @@ int main(int argc, const char * argv[]) {
 
         correctJobsNumber(jobs);
 
+        std::thread emitorThread([&emitor](){ emitor(); });
+
         for(u_int i = 0; i < jobs; ++i) { // TODO: check for inadequate values
             workers.emplace_back(
                     std::thread(Worker(emitor))
@@ -158,6 +160,8 @@ int main(int argc, const char * argv[]) {
         for(auto &p : workers) {
             p.join();
         }
+
+        emitorThread.join();
 
         if (countMode) {
             std::cout << "Matched documents: " << emitor.getCountedDocuments() << std::endl;

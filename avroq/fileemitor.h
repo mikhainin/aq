@@ -8,6 +8,9 @@
 
 #include <avro/limiter.h>
 
+#include <util/concurrent_queue.hpp>
+
+
 namespace avro {
   class Reader;
   struct header;
@@ -27,6 +30,8 @@ struct Task {
     std::shared_ptr<avro::StringBuffer> buffer;
     std::shared_ptr<avro::dumper::TsvExpression> tsvFieldsList;
     int64_t objectCount;
+    size_t fileId;
+    std::string currentFileName;
 };
 
 class FileEmitor {
@@ -45,6 +50,9 @@ public:
     size_t getCountedDocuments() const;
 
     const std::string &getLastError() const;
+
+    void operator()();
+
 private:
     const std::vector<std::string> &fileList;
     std::string fieldSeparator;
@@ -61,6 +69,8 @@ private:
     bool countMode = false;
     bool parseLoopEnabled = false;
     std::string lastError;
+
+    util::conqurrent_queue<std::shared_ptr<Task>> queue;
 
     bool canProduceNextTask();
 
