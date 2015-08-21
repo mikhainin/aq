@@ -73,6 +73,7 @@ private:
     util::conqurrent_queue<std::shared_ptr<Task>> queue;
 
     bool canProduceNextTask();
+    void mainLoop();
 
     void countDocument(size_t num);
 
