@@ -8,7 +8,7 @@
 
 #include <avro/limiter.h>
 
-#include <util/concurrent_queue.hpp>
+#include <util/concurrentqueue.hpp>
 
 
 namespace avro {
@@ -73,6 +73,7 @@ private:
     util::conqurrent_queue<std::shared_ptr<Task>> queue;
 
     bool canProduceNextTask();
+    void mainLoop();
 
     void countDocument(size_t num);
 

@@ -13,6 +13,8 @@
 
 #include <filter/filter.h>
 
+#include <util/onscopeexit.h>
+
 #include "fileemitor.h"
 
 
@@ -99,8 +101,15 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
 
 
         ++currentFile;
+=======
 
+    std::shared_ptr<Task> task;
+>>>>>>> threaded_input
+
+    if (!queue.pop(task) || stop) {
+    	return std::shared_ptr<Task>();
     }
+<<<<<<< HEAD
 */
     std::shared_ptr<Task> task;// (new Task(currentTaskSample));
 
@@ -155,13 +164,6 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
         }
     }
 
-    task->buffer.reset(new avro::StringBuffer(
-        task->reader->nextBlock(
-            *task->header,
-            task->objectCount
-        )
-    ));
-
     return task;
 }
 
@@ -186,6 +188,20 @@ const std::string &FileEmitor::getLastError() const {
 
 void FileEmitor::operator()() {
 
+	try {
+		mainLoop();
+	} catch(const std::runtime_error &e) {
+        // TODO: stop processing completely
+		stop = true;
+        std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
+    }
+}
+
+void FileEmitor::mainLoop() {
+
+	util::on_scope_exit dothis([this]() {
+			queue.done();
+		});
 	size_t currentFileId = 0;
 	for(auto const &currentFileName : fileList) {
 
@@ -198,8 +214,8 @@ void FileEmitor::operator()() {
         } catch (const std::runtime_error &e) {
             std::cerr << e.what() << std::endl;
             stop = true;
-            queue.done();
-            break;
+            std::cerr << e.what() << std::endl;
+            return;
         }
         currentTaskSample.header.reset(
                 new avro::header(currentTaskSample.reader->readHeader())
@@ -216,14 +232,14 @@ void FileEmitor::operator()() {
                     )
                 );
 		} catch (const avro::PathNotFound &e) {
-            stop = true;
-            queue.done();
-			//returnStop("Can't apply TSV expression to file: " + currentFileName + "\n"
-			//				  "path '" + e.getPath() + "' was not found");
+                    stop = true;
+                    lastError = "Can't apply TSV expression to file: " + currentFileName + "\n"
+	    					  "path '" + e.getPath() + "' was not found";
+                    return;
 		} catch (const std::runtime_error &e) {
-            stop = true;
-            queue.done();
-			// returnStop("Can't apply TSV expression to file: " + currentFileName + "\n" + e.what());
+                    lastError = "Can't apply TSV expression to file: " + currentFileName + "\n" + e.what();
+                    stop = true;
+                    return;
 		}
 
 		currentTaskSample.currentFileName = currentFileName;
@@ -241,7 +257,19 @@ void FileEmitor::operator()() {
 		        )
 		    ));
 
-			queue.push(task);
+            currentTaskSample.tsvFieldsList.reset(
+                    new avro::dumper::TsvExpression(
+                        currentTaskSample.reader->compileFieldsList(
+                                tsvFieldList,
+                                *currentTaskSample.header,
+                                fieldSeparator
+                            )
+                    )
+                );
+
+			if (!queue.push(task)) {
+				return;
+			}
 		}
 
 		++currentFileId;
