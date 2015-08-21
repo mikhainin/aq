@@ -26,7 +26,11 @@ public:
 		}
 
 		queue.push(v);
+
 		empty.notify_one();
+
+	    assert(queue.size() != 0);
+	    assert(v.get());
 
 		return true;
 	}
@@ -34,25 +38,32 @@ public:
 	bool pop(T &v) {
 		std::unique_lock<std::mutex> lock(m);
 
-		if (queue.size() == 0 && !is_done) {
+		// TODO: remove loop
+		while (queue.empty() && !is_done) {
 			empty.wait(lock);
 		}
 
-		if (is_done) {
+		if (queue.empty() && is_done) {
 			return false;
 		}
+
+	    assert(queue.size() != 0);
 
 		v = queue.front();
 		queue.pop();
 
-		if (queue.size() < (SIZE / 2)) {
+	    assert(v.get());
+
+		// if (queue.size() < (SIZE / 2)) {
 			full.notify_one();
-		}
+		// }
 
 		return true;
 	}
 
 	void done() {
+		std::unique_lock<std::mutex> lock(m);
+
 		is_done = true;
 
 		full.notify_all();

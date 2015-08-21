@@ -56,9 +56,10 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
 
     std::shared_ptr<Task> task;
 
-    if (!queue.pop(task)) {
+    if (!queue.pop(task) || stop) {
     	return std::shared_ptr<Task>();
     }
+    assert(task.get());
     if (!decoder || fileId != task->fileId) {
 
         fileId = task->fileId;
@@ -135,6 +136,7 @@ void FileEmitor::operator()() {
 		mainLoop();
 	} catch(const std::runtime_error &e) {
         // TODO: stop processing completely
+		stop = true;
         std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
     }
 }
@@ -142,7 +144,6 @@ void FileEmitor::operator()() {
 void FileEmitor::mainLoop() {
 
 	util::on_scope_exit dothis([this]() {
-			stop = true;
 			queue.done();
 		});
 	size_t currentFileId = 0;
@@ -155,6 +156,7 @@ void FileEmitor::mainLoop() {
         try{
             currentTaskSample.reader.reset(new avro::Reader(currentFileName));
         } catch (const std::runtime_error &e) {
+			stop = true;
             std::cerr << e.what() << std::endl;
             return;
         }
@@ -175,9 +177,11 @@ void FileEmitor::mainLoop() {
 		} catch (const avro::PathNotFound &e) {
 			lastError = "Can't apply TSV expression to file: " + currentFileName + "\n"
 									  "path '" + e.getPath() + "' was not found";
+			stop = true;
             return;
 		} catch (const std::runtime_error &e) {
 			lastError = "Can't apply TSV expression to file: " + currentFileName + "\n" + e.what();
+			stop = true;
             return;
 		}
 
@@ -185,7 +189,8 @@ void FileEmitor::mainLoop() {
 
 		while(!currentTaskSample.reader->eof()) {
 
-		    std::shared_ptr<Task> task(new Task(currentTaskSample));
+		    std::shared_ptr<Task> task(new Task());
+			*task = currentTaskSample;
 
 		    task->fileId = currentFileId;
 
@@ -196,9 +201,21 @@ void FileEmitor::mainLoop() {
 		        )
 		    ));
 
+            currentTaskSample.tsvFieldsList.reset(
+                    new avro::dumper::TsvExpression(
+                        currentTaskSample.reader->compileFieldsList(
+                                tsvFieldList,
+                                *currentTaskSample.header,
+                                fieldSeparator
+                            )
+                    )
+                );
+
+            assert(task.get());
 			if (!queue.push(task)) {
 				return;
 			}
+		    assert(task.get());
 		}
 
 		++currentFileId;
