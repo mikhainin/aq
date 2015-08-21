@@ -8,7 +8,7 @@
 
 #include <avro/limiter.h>
 
-#include <util/concurrent_queue.hpp>
+#include "util/concurrentqueue.hpp"
 
 
 namespace avro {

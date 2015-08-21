@@ -2,9 +2,9 @@
 #include <assert.h>
 
 #include <iostream>
-#include <functional>
 #include <stdexcept>
 
+#include <util/onscopeexit.h>
 #include "deflate.h"    
 
 namespace avro {
@@ -12,18 +12,6 @@ namespace codec {
 
 
 namespace {
-    struct scope_exit {
-        scope_exit(std::function<void()> f) : f(f ) {}
-        ~scope_exit() { f(); }
-    private:
-        std::function<void()> f;
-    };
-/*
-    constexpr unsigned long long operator"" _KiB ( unsigned long long b )
-    {
-        return b * 1024;
-    }
-*/
     constexpr unsigned long long operator"" _MiB ( unsigned long long b )
     {
         return b * 1024 * 1024;
@@ -49,7 +37,7 @@ StringBuffer Deflate::decode(
 
     assert(ret == Z_OK);
 
-    scope_exit cleanup([&]{inflateEnd(&strm);}); // std::bind(inflateEnd, &strm));
+    util::on_scope_exit cleanup([&]{inflateEnd(&strm);}); // std::bind(inflateEnd, &strm));
 
     /* decompress until deflate stream ends or end of file */
     strm.avail_in = encodedData.size();

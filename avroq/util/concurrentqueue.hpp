@@ -1,3 +1,7 @@
+#ifndef __util_conqurrentqueue_
+#define __util_conqurrentqueue_
+
+#include <atomic>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -7,18 +11,24 @@ namespace util {
 template <class T, int SIZE = 100>
 class conqurrent_queue {
 public:
-	void push(T &v) {
+
+	conqurrent_queue() : is_done(false) {
+	}
+
+	bool push(T &v) {
 		std::unique_lock<std::mutex> lock(m);
 
-		if (queue.size() > SIZE) {
+		if (queue.size() > SIZE && !is_done) {
 			full.wait(lock);
 		}
 		if (is_done) {
-			return;
+			return false;
 		}
 
 		queue.push(v);
 		empty.notify_one();
+
+		return true;
 	}
 
 	bool pop(T &v) {
@@ -35,7 +45,9 @@ public:
 		v = queue.front();
 		queue.pop();
 
-		full.notify_one();
+		if (queue.size() < (SIZE / 2)) {
+			full.notify_one();
+		}
 
 		return true;
 	}
@@ -52,7 +64,9 @@ private:
 	std::mutex m;
 	std::condition_variable full;
 	std::condition_variable empty;
-	bool is_done = false;
+	std::atomic_bool is_done;
 };
 
 }
+
+#endif
