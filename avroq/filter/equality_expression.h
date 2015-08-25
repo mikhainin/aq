@@ -63,7 +63,7 @@ namespace detail {
         string_operator::ops_t strop;
         /*
         bool is_array_element = false;
-        int array_index = 0;
+        size_t array_index = 0;
         std::vector<bool> array_states;
 */
 

@@ -17,6 +17,7 @@ print column names in tsv-mode
 remove ":" when printing arrays
 field.* notation
 add array expressions for complex types
+[bug] log_files[0]:contains("nobid") syntax doesn't work when log_files[any]:contains("nobid") is okay
 
 Long term TODO
 ==============

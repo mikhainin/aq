@@ -159,17 +159,21 @@ namespace client
          //     any-Unicode-character-except-"-or-\-or-control-character
          //
          quoted =
+              (
                 '"'
                 > *(  char_esc(_val)
                     | (char_ - '"' - '\\' - cntrl)    [_val += _1]
                    )
                 > '"'
-            |
+              )
+              |
+              (
                   '\''
                 > *(  char_esc(_val)
                     | (char_ - '\'' - '\\' - cntrl)    [_val += _1]
                    )
                 > '\''
+              )
             ;
 
          BOOST_SPIRIT_DEBUG_NODE(escape);
