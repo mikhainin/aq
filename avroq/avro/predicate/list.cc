@@ -225,6 +225,8 @@ void List::processPredicate(
         }
     }
 
+    assert(!filterNode->is<node::Custom>());
+
     if (filterNode->is<node::Array>()) {
         // put predicate on both items: on array and on element
         filterItems.insert(
@@ -235,6 +237,7 @@ void List::processPredicate(
             );
 
         filterNode = filterNode->as<node::Array>().getItemsType().get();
+        filterNode = unwrapCustom(filterNode);
 
         if (filterNode->is<node::Union>()) {
             throw std::runtime_error("Only arrays of primitive types are supported. "
