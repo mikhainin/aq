@@ -2,6 +2,12 @@ v0.1
 ====
 print path to corrupted file
 
+v0.2
+====
+display as JSON
+print records (as json) int TSV format
+
+
 TODO
 ====
 print names/values in columns (to be able to copy field names)
