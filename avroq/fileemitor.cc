@@ -5,6 +5,8 @@
 
 #include <boost/lambda/lambda.hpp>
 
+#include <util/onscopeexit.h>
+
 #include <avro/node/all_nodes.h>
 #include <avro/blockdecoder.h>
 #include <avro/exception.h>
@@ -157,13 +159,6 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
         }
     }
 
-    task->buffer.reset(new avro::StringBuffer(
-        task->reader->nextBlock(
-            *task->header,
-            task->objectCount
-        )
-    ));
-
     return task;
 }
 
@@ -187,6 +182,20 @@ const std::string &FileEmitor::getLastError() const {
 }
 
 void FileEmitor::operator()() {
+       try {
+               mainLoop();
+       } catch(const std::runtime_error &e) {
+        // TODO: stop processing completely
+               stop = true;
+        std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
+    }
+}
+
+void FileEmitor::mainLoop() {
+
+       util::on_scope_exit dothis([this]() {
+                       queue.done();
+               });
 
 	size_t currentFileId = 0;
 	for(auto const &currentFileName : fileList) {
@@ -200,7 +209,6 @@ void FileEmitor::operator()() {
         } catch (const std::runtime_error &e) {
             std::cerr << e.what() << std::endl;
             stop = true;
-            queue.done();
             break;
         }
         currentTaskSample.header.reset(
@@ -219,12 +227,16 @@ void FileEmitor::operator()() {
                 );
 		} catch (const avro::PathNotFound &e) {
             stop = true;
-            queue.done();
+                    lastError = "Can't apply TSV expression to file: " + currentFileName + "\n"
+                                                 "path '" + e.getPath() + "' was not found";
+            return;
 			//returnStop("Can't apply TSV expression to file: " + currentFileName + "\n"
 			//				  "path '" + e.getPath() + "' was not found");
 		} catch (const std::runtime_error &e) {
             stop = true;
-            queue.done();
+                    lastError = "Can't apply TSV expression to file: " + currentFileName + "\n" + e.what();
+
+            return;
 			// returnStop("Can't apply TSV expression to file: " + currentFileName + "\n" + e.what());
 		}
 
@@ -243,7 +255,9 @@ void FileEmitor::operator()() {
 		        )
 		    ));
 
-			queue.push(task);
+		    if(!queue.push(task)) {
+                        return;
+                    }
 		}
 
 		++currentFileId;
