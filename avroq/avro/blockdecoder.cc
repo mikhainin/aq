@@ -7,7 +7,6 @@
 #include "dumper/fool.h"
 
 #include "node/all_nodes.h"
-#include "node/nodebypath.h"
 
 #include "predicate/list.h"
 #include "predicate/predicate.h"
@@ -29,9 +28,8 @@ BlockDecoder::BlockDecoder(const struct header &header, Limiter &limit) : header
 
 
 void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
-    filter = std::move(flt);
 
-    predicates.reset(new predicate::List(filter->getPredicates(), header.schema.get()));
+    predicates.reset(new predicate::List(std::move(flt), header.schema.get()));
 
     if (parseLoopEnabled) {
         compileFilteringParser(parseLoop, header.schema);
@@ -66,7 +64,7 @@ void BlockDecoder::enableParseLoop() {
 
 void BlockDecoder::decodeAndDumpBlock(Block &block) {
 
-    if (countOnly && !filter) {
+    if (countOnly && !predicates) {
         // TODO: count without decompression
         coutMethod(block.objectCount);
         return;
@@ -91,14 +89,14 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
             decodeDocument(block.buffer, header.schema);
         }
 
-        if (!filter || filter->expressionPassed()) {
+        if (!predicates || predicates->expressionPassed()) {
 
             limit.documentFinished();
 
             dumpDocument(block);
 
-            if(filter) {
-                filter->resetState();
+            if(predicates) {
+                predicates->resetState();
             }
         }
     }
@@ -134,12 +132,24 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         for(auto &p : schema->as<node::Record>().getChildren()) {
             decodeDocument(stream, p);
         }
+        if (predicates) {
+            auto range = predicates->getEqualRange(schema.get());
+            if (range.first != range.second) {
+                for_each (
+                    range.first,
+                    range.second,
+                    [](const auto& filterItem){
+                        filterItem.second->recordEnd();
+                    }
+                );
+            }
+        }
     } else if (schema->is<node::Union>()) {
         int item = TypeParser<int>::read(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
         decodeDocument(stream, node);
 
-        if (filter) {
+        if (predicates) {
             auto range = predicates->getEqualRange(schema.get());
             if (range.first != range.second) {
                 for_each (
@@ -164,7 +174,7 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
             objectsInBlock = TypeParser<int>::read(stream);
 
             decltype(predicates->getEqualRange(schema.get())) range;
-            if (filter) {
+            if (predicates) {
                 range = predicates->getEqualRange(schema.get());
             }
             for(int i = 0; i < objectsInBlock; ++i) {
@@ -425,6 +435,38 @@ private:
 };
 
 
+
+class ApplyRecord {
+public:
+
+    explicit ApplyRecord(int ret,
+        predicate::List::filter_items_t::iterator start,
+        predicate::List::filter_items_t::iterator end)
+        : ret(ret),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        for_each (
+            start, end,
+            [](const auto& filterItem){
+                filterItem.second->recordEnd();
+            }
+        );
+        return ret;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        return operator() (stream);
+    }
+private:
+    int ret;
+    predicate::List::filter_items_t::iterator start;
+    predicate::List::filter_items_t::iterator end;
+};
+
+
 class SkipMap {
 public:
     explicit SkipMap(int ret, BlockDecoder::const_node_t &schema, BlockDecoder &decoder)
@@ -462,7 +504,7 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
 
         const auto &u = schema->as<node::Union>();
 
-        size_t nullIndex = -1; // u.nullIndex();
+        size_t nullIndex = -1;
 
         auto size = u.getChildren().size();
 
@@ -485,8 +527,15 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
     } else if (schema->is<node::Custom>()) {
         return compileFilteringParser(parse_items, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Record>()) {
+            if (predicates) {
+                auto range = predicates->getEqualRange(schema.get());
+                if (range.first != range.second) {
+                    auto it = parse_items.begin();
+                    parse_items.emplace(it, ApplyRecord(elementsToSkip, range.first, range.second));
+                }
+            }
         auto &children = schema->as<node::Record>().getChildren();
-        size_t size = 0;
+        size_t size = 1;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
             size += compileFilteringParser(parse_items, *c);
         }
@@ -494,7 +543,7 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
     } else if (schema->is<node::Array>()) {
 
             auto it = parse_items.begin();
-            if (filter) {
+            if (predicates) {
                 auto range = predicates->getEqualRange(schema.get());
                 if (range.first != range.second) {
                     parse_items.emplace(it, ApplyArray(elementsToSkip, range.first, range.second, schema->as<node::Array>().getItemsType(), *this));
@@ -536,7 +585,7 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
 template <typename SkipType, typename ApplyType, typename... Args>
 void BlockDecoder::skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
     auto it = parse_items.begin();
-    if (filter) {
+    if (predicates) {
         auto range =  predicates->getEqualRange(schema.get());
         if (range.first != range.second) {
             parse_items.emplace(it, ApplyType(ret, range.first, range.second, args...));
@@ -844,7 +893,7 @@ void BlockDecoder::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<no
 
 template <typename T>
 void BlockDecoder::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema) {
-    if (filter) {
+    if (predicates) {
         auto range = predicates->getEqualRange(schema.get());
         if (range.first != range.second) {
             const auto &value = TypeParser<T>::read(stream);
@@ -859,14 +908,6 @@ void BlockDecoder::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_p
         }
     }
     TypeParser<T>::skip(stream);
-}
-
-const node::Node* BlockDecoder::schemaNodeByPath(const std::string &path) {
-    auto n = node::nodeByPath(path, header.schema.get());
-    if (n == nullptr) {
-        throw PathNotFound(path);
-    }
-    return n;
 }
 
 

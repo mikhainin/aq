@@ -53,7 +53,6 @@ private:
     const struct header &header;
     Limiter &limit;
     dumper::TsvExpression tsvFieldsList;
-    std::unique_ptr<filter::Filter> filter;
     std::unique_ptr<predicate::List> predicates;
 
     std::function<void(const std::string &)> dumpMethod;
@@ -75,8 +74,6 @@ private:
 
     template <typename T>
     typename T::result_type convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const;
-
-    const node::Node* schemaNodeByPath(const std::string &path);
 
     int compileFilteringParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip = 1);
 

@@ -256,9 +256,13 @@ namespace client
 
             braces_expr =
                   '(' >> logical_expression   [_val = _1] >> ')'
+                | lit("not") >> (
+                      equality_expr           [_val != _1]
+                    | record_expr             [_val != _1]
+                    )
                 | equality_expr               [_val = _1]
                 | record_expr                 [_val = _1]
-                | lit("not") >> equality_expr [_val != _1];
+                ;
 
             logical_expression =
                     braces_expr                 [_val = _1]
@@ -316,6 +320,7 @@ std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
         std::string rest(iter, end);
         throw CompileError(rest);
     }
+    // std::cout << "Compile ok" << std::endl;
     return std::make_shared<Filter>(ast);
 }
 

@@ -3,6 +3,7 @@ add_library(filter
 				 filter.cc
                  equality_expression.cc
                  record_expression.cc
+                 state.cc
 
                  detail/ast.cc
 )

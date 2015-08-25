@@ -7,13 +7,17 @@
 #include <boost/variant.hpp>
 
 #include "nil.h"
+#include "state.h"
 #include "string_operator.h"
 
 namespace filter {
+
+struct record_expression;
+
 namespace detail {
     struct array_element;
 }
-    struct equality_expression
+    struct equality_expression : public state
     {
         enum OP {
             EQ,
@@ -57,19 +61,23 @@ namespace detail {
         std::string identifier;
         OP op;
         string_operator::ops_t strop;
+        /*
         bool is_array_element = false;
         int array_index = 0;
         std::vector<bool> array_states;
-
+*/
 
         /// state
-
+/*
         bool state = false;
 
         void resetState();
         void setState(bool newState);
         bool getState() const;
         void pushState();
+*/
+        record_expression * parent = nullptr;
+        void setParent(record_expression * parent);
     };
 
 }

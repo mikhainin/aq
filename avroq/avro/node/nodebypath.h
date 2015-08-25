@@ -10,6 +10,9 @@ class Node;
 
 const Node* nodeByPath(const std::string &path, const Node* rootNode);
 
+// use tags here
+const Node* nodeByPathIgnoreArray(const std::string &path, const Node* rootNode);
+
 }
 }
 

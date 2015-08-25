@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include <avro/stringbuffer.h>
 
@@ -114,6 +115,22 @@ void Predicate::pushArrayState() {
     assert(expr->is_array_element && "Predicate::pushArrayState: called for non-array element");
     expr->pushState();
 }
+void Predicate::recordEnd() {
+    assert(false && "How did you get here?!");
+}
+
+
+
+RecordPredicate::RecordPredicate(filter::record_expression *expr) : state(expr) {
+}
+void RecordPredicate::pushArrayState() {
+    state->pushState();
+}
+
+void RecordPredicate::recordEnd() {
+    state->evaluateState();
+}
+
 
 
 }

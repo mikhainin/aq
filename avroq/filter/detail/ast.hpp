@@ -1,11 +1,3 @@
-//
-//  ast.hpp
-//  
-//
-//  Created by Mikhail Galanin on 26/04/15.
-//
-//
-
 #ifndef __avroq_filter_detail_ast_hpp
 #define __avroq_filter_detail_ast_hpp
 

@@ -1,8 +1,10 @@
+#include <boost/algorithm/string.hpp>
 
 #include <avro/exception.h>
 #include <avro/node/all_nodes.h>
 #include <avro/node/nodebypath.h>
 #include <filter/equality_expression.h>
+#include <filter/filter.h>
 #include <filter/record_expression.h>
 
 #include "predicate.h"
@@ -110,119 +112,236 @@ namespace predicate {
 
 
 
-List::List(std::vector<filter::equality_expression*> exprList, const node::Node *rootNode)
-    : exprList(exprList),
+List::List(std::unique_ptr<filter::Filter> filter, const node::Node *rootNode)
+    : filter(std::move(filter)),
       rootNode(rootNode) {
+
       assignItems();
+
+}
+
+bool List::expressionPassed() {
+    return filter->expressionPassed();
+}
+
+void List::resetState() {
+    filter->resetState();
 }
 
 
 void List::assignItems() {
-    for(auto &filterPredicate : exprList) {
-        const node::Node * filterNode = schemaNodeByPath(filterPredicate->identifier);
 
-        if (filterNode->is<node::Custom>()) {
-            filterNode = filterNode->as<node::Custom>().getDefinition().get();
-        }
-        if (filterNode->is<node::Union>()) {
-            for( auto &p : filterNode->as<node::Union>().getChildren()) {
-                if (filterPredicate->op == filter::equality_expression::IS_NIL ||
-                    filterPredicate->op == filter::equality_expression::NOT_NIL
-                ) {
-                    if (!filterNode->as<node::Union>().containsNull()) {
-                        throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
-                    }
+    for(auto &predicate : filter->getPredicates()) {
+        auto filterNode = schemaPathByIdent(predicate->identifier);
+        processPredicate(predicate, filterNode);
+        // std::cout << "pred node " << predicate->identifier << std::endl;
+    }
 
-                    // TODO lookup for index of NULL-node in the union
+    for(auto &record : filter->getRecordExpressions()) {
+        auto parentNode = unwrapCustom(schemaPathByIdent(record->identifier));
+        parentNode = notNullUnion(parentNode);
+        parentNode = unwrapCustom(parentNode);
+        // std::cout << "record node " << record->identifier << " " << parentNode->getTypeName() << std::endl;
+        // (void)parentNode; // TODO: use me
 
-                    break;
-                }
+        if (parentNode->is<node::Array>()) {
+            filterItems.insert(
+                    std::make_pair(
+                        parentNode,
+                        std::make_shared<predicate::RecordPredicate>(record)
+                    )
+                );
+            // put predicate on both items: on array and on element
+            // std::cout << "IS ARRAY " << record->identifier << std::endl;
+            parentNode = parentNode->as<node::Array>().getItemsType().get();
+            // parentNode = notNullUnion(parentNode);
+            parentNode = unwrapCustom(parentNode);
 
-                filterNode = p.get();
 
-                if (filterNode->is<node::Custom>()) {
-                    filterNode = filterNode->as<node::Custom>().getDefinition().get();
-                }
-                if (filterNode->isOneOf<
-                            node::Array,
-                            node::Boolean,
-                            node::Double,
-                            node::Enum,
-                            node::Float,
-                            node::Int,
-                            node::Long,
-                            node::String
-                            >()) {
-                    break;
-                }
+            filterItems.insert(
+                    std::make_pair(
+                        parentNode,
+                        std::make_shared<predicate::RecordPredicate>(record)
+                    )
+                );
+            for(auto &predicate : filter->getPredicates(record)) {
+                auto filterNode = schemaPathByIdent(predicate->identifier, parentNode);
+                /// std::cout << "record pred node " << predicate->identifier << std::endl;
+                processPredicate(predicate, filterNode);
             }
+
         } else {
+            for(auto &predicate : filter->getPredicates(record)) {
+                auto filterNode = schemaPathByIdent(predicate->identifier, parentNode);
+                std::cout << "record pred node " << predicate->identifier << std::endl;
+                processPredicate(predicate, filterNode);
+            }
+        }
+
+    }
+}
+
+void List::processPredicate(
+            filter::equality_expression* filterPredicate,
+            const node::Node * filterNode) {
+
+    filterNode = unwrapCustom(filterNode);
+
+    if (filterNode->is<node::Union>()) {
+        for( auto &p : filterNode->as<node::Union>().getChildren()) {
             if (filterPredicate->op == filter::equality_expression::IS_NIL ||
                 filterPredicate->op == filter::equality_expression::NOT_NIL
             ) {
-                throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
+                if (!filterNode->as<node::Union>().containsNull()) {
+                    throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
+                }
+
+                // TODO lookup for index of NULL-node in the union
+
+                break;
+            }
+
+            filterNode = unwrapCustom(p.get());
+
+            if (filterNode->isOneOf<
+                        node::Array,
+                        node::Boolean,
+                        node::Double,
+                        node::Enum,
+                        node::Float,
+                        node::Int,
+                        node::Long,
+                        node::String
+                        >()) {
+                break;
             }
         }
-
-        if (filterNode->is<node::Array>()) {
-            // put predicate on both items: on array and on element
-            filterItems.insert(
-                    std::make_pair(
-                        filterNode,
-                        std::make_shared<predicate::Predicate>(filterPredicate)
-                    )
-                );
-
-            filterNode = filterNode->as<node::Array>().getItemsType().get();
-
-            if (filterNode->is<node::Union>()) {
-                throw std::runtime_error("Only arrays of primitive types are supported. "
-                 "Can't process field '" + filterPredicate->identifier + "'");
-            }
+    } else {
+        if (filterPredicate->op == filter::equality_expression::IS_NIL ||
+            filterPredicate->op == filter::equality_expression::NOT_NIL
+        ) {
+            // TODO: take into accout parent nodes path
+            throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
         }
+    }
 
-        if (filterNode->isOneOf<node::Union>()) {
-            ; // ok, acceptable only for isnil/notnil operations
-        } else if (filterNode->is<node::Enum>()) {
-            auto const &e = filterNode->as<node::Enum>();
-            int i = e.findIndexForValue(boost::get<std::string>(filterPredicate->constant));
-            if (i == -1) {
-                // TODO: add list of valid values
-                throw std::runtime_error("Invalid value for enum field '" + filterPredicate->identifier + "'");
-            }
-            filterPredicate->constant = i;
-        } else if (filterNode->is<node::String>()) {
-            filterPredicate->constant = convertFilterConstant<ToString>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Boolean>()) {
-            filterPredicate->constant = convertFilterConstant<ToBoolean>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Double>()) {
-            filterPredicate->constant = convertFilterConstant<ToDouble>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Float>()) {
-            filterPredicate->constant = convertFilterConstant<ToFloat>(filterPredicate, filterNode);
-        } else if (filterNode->isOneOf<node::Int, node::Long>()) {
-            filterPredicate->constant = convertFilterConstant<ToInt>(filterPredicate, filterNode);
-        } else {
-            throw std::runtime_error(
-                "Sorry, but type '" + filterNode->getTypeName() +
-                "' for field '" + filterPredicate->identifier + "' "
-                "Is not yet supported in filter expression.");
-        }
+    if (filterNode->is<node::Array>()) {
+        // put predicate on both items: on array and on element
         filterItems.insert(
                 std::make_pair(
                     filterNode,
                     std::make_shared<predicate::Predicate>(filterPredicate)
                 )
             );
+
+        filterNode = filterNode->as<node::Array>().getItemsType().get();
+
+        if (filterNode->is<node::Union>()) {
+            throw std::runtime_error("Only arrays of primitive types are supported. "
+             "Can't process field '" + filterPredicate->identifier + "'");
+        }
     }
+
+    if (filterNode->isOneOf<node::Union>()) {
+        ; // ok, acceptable only for isnil/notnil operations
+    } else if (filterNode->is<node::Enum>()) {
+        auto const &e = filterNode->as<node::Enum>();
+        int i = e.findIndexForValue(boost::get<std::string>(filterPredicate->constant));
+        if (i == -1) {
+            // TODO: add list of valid values
+            throw std::runtime_error("Invalid value for enum field '" + filterPredicate->identifier + "'");
+        }
+        filterPredicate->constant = i;
+    } else if (filterNode->is<node::String>()) {
+        filterPredicate->constant = convertFilterConstant<ToString>(filterPredicate, filterNode);
+    } else if (filterNode->is<node::Boolean>()) {
+        filterPredicate->constant = convertFilterConstant<ToBoolean>(filterPredicate, filterNode);
+    } else if (filterNode->is<node::Double>()) {
+        filterPredicate->constant = convertFilterConstant<ToDouble>(filterPredicate, filterNode);
+    } else if (filterNode->is<node::Float>()) {
+        filterPredicate->constant = convertFilterConstant<ToFloat>(filterPredicate, filterNode);
+    } else if (filterNode->isOneOf<node::Int, node::Long>()) {
+        filterPredicate->constant = convertFilterConstant<ToInt>(filterPredicate, filterNode);
+    } else {
+        throw std::runtime_error(
+            "Sorry, but type '" + filterNode->getTypeName() +
+            "' for field '" + filterPredicate->identifier + "' "
+            "Is not yet supported in filter expression.");
+    }
+    filterItems.insert(
+            std::make_pair(
+                filterNode,
+                std::make_shared<predicate::Predicate>(filterPredicate)
+            )
+        );
+
 }
 
+
 const node::Node* List::schemaNodeByPath(const std::string &path) {
-    auto n = node::nodeByPath(path, rootNode);
+    auto n = node::nodeByPathIgnoreArray(path, rootNode);
     if (n == nullptr) {
         throw PathNotFound(path);
     }
     return n;
 }
+
+const node::Node * List::schemaPathByIdent(
+    const std::string &path, const node::Node * startNode) {
+
+    std::vector<std::string> chunks;
+    boost::algorithm::split(chunks, path, boost::is_any_of("."));
+
+    auto currentNode = startNode ? startNode : rootNode;
+
+    for(auto p = chunks.begin(); p != chunks.end(); ) {
+
+        auto chunkItem = currentNode;
+
+        if (chunkItem->is<node::Custom>()) {
+            chunkItem = chunkItem->as<node::Custom>().getDefinition().get();
+        /*} else if (chunkItem->is<node::Array>()) {
+            chunkItem = chunkItem->as<node::Array>().getItemsType().get();*/
+        } else if (chunkItem->is<node::Union>()) {
+            for( auto &n : chunkItem->as<node::Union>().getChildren()) {
+                if (!n->is<node::Null>()) {
+                    chunkItem = n.get();
+                }
+            }
+        } else if (chunkItem->is<node::Record>()) {
+            for( auto &n : chunkItem->as<node::Record>().getChildren()) {
+                if (n->getItemName() == *p) {
+                    chunkItem = n.get();
+                    ++p;
+                    break;
+                }
+            }
+        }
+        // std::cout << chunkItem->getItemName() << ':' << chunkItem->getTypeName() << std::endl;
+
+        if (chunkItem != currentNode) {
+            currentNode = chunkItem;
+            continue;
+        }
+        throw PathNotFound(path);
+        // return nullptr;
+    }
+
+    if (currentNode == nullptr) {
+        throw PathNotFound(path);
+    }
+/*
+    std::vector<const node::Node *> result = {currentNode};
+
+    while( (auto parent = currentNode->parent) != nullptr) {
+
+    }
+*/
+    return currentNode;
+
+
+}
+
 
 template <typename T>
 typename T::result_type List::convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const {
@@ -233,6 +352,25 @@ typename T::result_type List::convertFilterConstant(const filter::equality_expre
             + " expected: " + filterNode->getTypeName() + ", got: " +
             e.name);
     }
+}
+
+
+const node::Node * List::unwrapCustom(const node::Node * node) {
+    while (node->is<node::Custom>()) {
+        node = node->as<node::Custom>().getDefinition().get();
+    }
+    return node;
+}
+const node::Node * List::notNullUnion(const node::Node * node) {
+    while (node->is<node::Union>()) {
+        for( auto &n : node->as<node::Union>().getChildren()) {
+            if (!n->is<node::Null>()) {
+                node = n.get();
+                break;
+            }
+        }
+    }
+    return node;
 }
 
 
