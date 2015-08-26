@@ -182,6 +182,11 @@ std::shared_ptr<Task> FileEmitor::returnStop(const std::string &reason) {
     return std::shared_ptr<Task>();
 }
 
+void FileEmitor::finished() {
+    stop = true;
+    queue.done();
+}
+
 const std::string &FileEmitor::getLastError() const {
     return lastError;
 }

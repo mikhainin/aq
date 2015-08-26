@@ -49,6 +49,7 @@ void Worker::operator()() {
         } catch (const avro::Eof &e) {
             ; // reading done
         } catch (const avro::Finished &e) {
+        	emitor.finished();
             break;
         } catch(const std::runtime_error &e) {
             // TODO: stop processing completely
