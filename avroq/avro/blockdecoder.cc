@@ -314,11 +314,15 @@ void BlockDecoder::dumpDocument(Block &block) {
         coutMethod(1);
         return;
     }
+    /*void _dump_deb();
+    _dump_deb();
+    std::cout << "===================\n";*/
     block.buffer.resetToDocument();
     if (tsvFieldsList.pos > 0) {
         dumper::Tsv dumper(tsvFieldsList);
         if (parseLoopEnabled) {
             for(size_t i = 0; i < tsvDumpLoop.size(); ) {
+                // std::cout << "i=" << i << std::endl;
                 i += tsvDumpLoop[i](block.buffer, dumper);
             }
         } else {
@@ -330,6 +334,8 @@ void BlockDecoder::dumpDocument(Block &block) {
         dumpDocument(block.buffer, header.schema, dumper);
         dumper.EndDocument(dumpMethod);
     }
+
+    // std::cout.flush();
 }
 
 
@@ -430,11 +436,13 @@ public:
                     int ret,
                     BlockDecoder::filter_items_t::iterator start,
                     BlockDecoder::filter_items_t::iterator end,
-                    int nullIndex)
+                    int nullIndex,
+                    std::vector<int> &skipping)
         : ret(ret),
           start(start),
           end(end),
-          nullIndex(nullIndex) {
+          nullIndex(nullIndex),
+          skipping(skipping) {
     }
     int operator() (DeflatedBuffer &stream) {
         const auto &value = TypeParser<int>::read(stream);
@@ -444,26 +452,28 @@ public:
                 filterItem.second->setIsNull(value == this->nullIndex);
             }
         );
-        return value + ret;
+        return skipping[value];
     }
 private:
     int ret;
     BlockDecoder::filter_items_t::iterator start;
     BlockDecoder::filter_items_t::iterator end;
     int nullIndex;
+    std::vector<int> skipping;
 };
 
 class JumpToN {
 public:
-    JumpToN(int ret, int nullIndex) : ret(ret) {
+    JumpToN(int ret, int nullIndex, std::vector<int> &skipping)
+        : skipping(skipping) {
         (void)nullIndex;
     }
     int operator() (DeflatedBuffer &stream) {
         int i = TypeParser<int>::read(stream);
-        return i + ret;
+        return skipping[i];
     }
 private:
-    int ret;
+    std::vector<int> skipping;
 };
 
 class SkipInt {
@@ -673,6 +683,7 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
         auto &children = u.getChildren();
         int i = size;
 
+        std::vector<int> skipping;
         int elementsLeft = elementsToSkip;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
             --i;
@@ -681,9 +692,10 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
                 nullIndex = i;
             }
             elementsLeft += compileFilteringParser(parse_items, p, elementsLeft);
+            skipping.push_back(elementsLeft - elementsToSkip);
         }
 
-        skipOrApplyCompileFilter<JumpToN, ApplyUnion>(parse_items, schema, elementsToSkip, nullIndex);
+        skipOrApplyCompileFilter<JumpToN, ApplyUnion>(parse_items, schema, elementsToSkip, nullIndex, skipping);
 
         return elementsLeft;
     } else if (schema->is<node::Custom>()) {
@@ -867,17 +879,55 @@ public:
 
 class JumpToNTsv {
 public:
-    JumpToNTsv(int ret) : ret(ret) {
+    JumpToNTsv(std::vector<int> &skipping)
+        : skipping(skipping) {
     }
+
     int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
         (void)tsv;
         int i = TypeParser<int>::read(stream);
-        return i + ret;
+        return skipping[i];
     }
-private:
-    int ret;
-};
 
+private:
+    std::vector<int> skipping;
+};
+/*
+#include <list>
+#include <tuple>
+
+std::list<std::tuple<int,std::string, std::vector<int>>> debugTsvExpression;
+void _deb(int i, const std::unique_ptr<node::Node> &schema) {
+    debugTsvExpression.push_front(
+        std::tuple<int,std::string, std::vector<int>>(
+            i, schema->getItemName() + ':' + schema->getTypeName(), std::vector<int>())
+    );
+}
+
+void _deb(int i, const std::unique_ptr<node::Node> &schema, std::vector<int> &v) {
+    debugTsvExpression.push_front(
+        std::tuple<int,std::string, std::vector<int>>(
+            i, schema->getItemName() + ':' + schema->getTypeName(), v)
+    );
+}*/
+/*
+void _dump_deb() {
+    int num = 0;
+    for(auto &i : debugTsvExpression) {
+        std::cout << num++ << ' ' << std::get<0>(i) << ' ' << std::get<1>(i);
+
+        if (std::get<2>(i).size() > 0) {
+            std::cout << '[';
+            for (int x : std::get<2>(i)) {
+                std::cout << x << ',';
+            }
+            std::cout << ']';
+        }
+
+        std::cout << std::endl;
+    }
+}
+*/
 int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip) {
 
     if (schema->is<node::Union>()) {
@@ -886,13 +936,19 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
 
         auto &children = u.getChildren();
 
+        std::vector<int> skipping;
         int elementsLeft = elementsToSkip;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
+            // auto p = skipping.begin();
             elementsLeft += compileTsvExpression(parse_items, *c, elementsLeft);
+            skipping.push_back(elementsLeft - elementsToSkip);
         }
-
+        /*if (schema->getItemName() == "demand") {
+            std::cout << "======= " << elementsToSkip << ' ' << elementsLeft << std::endl;
+        }*/
+        //_deb(elementsToSkip, schema, skipping);
         auto it = parse_items.begin();
-        parse_items.emplace(it, JumpToNTsv(elementsToSkip));
+        parse_items.emplace(it, JumpToNTsv(skipping));
 
         return elementsLeft;
     } else if (schema->is<node::Custom>()) {
@@ -905,19 +961,24 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
         }
         return size;
     } else if (schema->is<node::Array>()) {
-            auto it = parse_items.begin();
-            parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
-            return 1;
+        //_deb(elementsToSkip, schema);
+        auto it = parse_items.begin();
+        parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+        return 1;
     } else if (schema->is<node::Map>()) {
-            auto it = parse_items.begin();
-            parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
-            return 1;
+        //_deb(elementsToSkip, schema);
+        auto it = parse_items.begin();
+        parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+        return 1;
     } else {
         if (schema->is<node::String>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<ParseToTsvAdapter<SkipString>, ApplyTsv<StringBuffer>>(parse_items, schema, elementsToSkip);
         } else if (schema->isOneOf<node::Int, node::Long>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<ParseToTsvAdapter<SkipInt>, ApplyTsv<int>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Enum>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<SkipTsvEnum, ApplyTsvEnum>(
                     parse_items,
                     schema,
@@ -925,12 +986,16 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
                     schema->as<node::Enum>().getItems()
                 );
         } else if (schema->is<node::Float>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<SkipNBytes<4>, ApplyTsv<float>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Double>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<SkipNBytes<8>, ApplyTsv<double>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Boolean>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<SkipNBytes<1>, ApplyTsv<bool>>(parse_items, schema, elementsToSkip);
         } else if (schema->is<node::Null>()) {
+            //_deb(elementsToSkip, schema);
             skipOrApplyTsvExpression<SkipNBytes<0>, ApplyTsvNull>(parse_items, schema, elementsToSkip);
             return 1; // Empty item. TODO: do not even insert it
         } else {
