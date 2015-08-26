@@ -182,13 +182,13 @@ const std::string &FileEmitor::getLastError() const {
 }
 
 void FileEmitor::operator()() {
-       try {
-               mainLoop();
-       } catch(const std::runtime_error &e) {
-        // TODO: stop processing completely
-               stop = true;
-        std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
-    }
+	try {
+		mainLoop();
+	} catch(const std::runtime_error &e) {
+		// TODO: stop processing completely
+		stop = true;
+		std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
+	}
 }
 
 void FileEmitor::mainLoop() {
