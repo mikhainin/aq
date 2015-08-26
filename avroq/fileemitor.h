@@ -46,6 +46,7 @@ public:
     void enableParseLoop();
     void setFilter(std::shared_ptr<filter::Filter> filter);
     void setTsvFieldList(const std::string &tsvFieldList, const std::string &fieldSeparator);
+    void finished();
 
     size_t getCountedDocuments() const;
 
