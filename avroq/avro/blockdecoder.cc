@@ -723,7 +723,44 @@ private:
     int ret;
 };
 
+class ApplyTsvAsJson {
+public:
+    ApplyTsvAsJson(int ret,
+        dumper::TsvExpression::map_t::iterator start,
+        dumper::TsvExpression::map_t::iterator end,
+        BlockDecoder::const_node_t &schema,
+        BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        dumper::Json<dumper::JsonTag::plain> dumper;
 
+        decoder.dumpDocument(stream, nodeType, dumper);
+
+        const auto &value = dumper.GetAsString();
+
+        for_each (
+            start, end,
+            [&value, &tsv, this](const auto& tsvItem){
+                tsv.addToPosition(value, tsvItem.second);
+            }
+        );
+
+        return ret;
+
+    }
+
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+    dumper::TsvExpression::map_t::iterator start;
+    dumper::TsvExpression::map_t::iterator end;
+};
 
 template <typename T>
 class ParseToTsvAdapter : public T {
@@ -816,21 +853,39 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
     } else if (schema->is<node::Custom>()) {
         return compileTsvExpression(parse_items, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Record>()) {
-        auto &children = schema->as<node::Record>().getChildren();
-        size_t size = 0;
-        for(auto c = children.rbegin(); c != children.rend(); ++c) {
-            size += compileTsvExpression(parse_items, *c);
+        auto p = tsvFieldsList.what.equal_range(schema->getNumber());
+        if (p.first != p.second) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, ApplyTsvAsJson(elementsToSkip, p.first, p.second, schema, *this));
+            return 1;
+        } else {
+            auto &children = schema->as<node::Record>().getChildren();
+            size_t size = 0;
+            for(auto c = children.rbegin(); c != children.rend(); ++c) {
+                size += compileTsvExpression(parse_items, *c);
+            }
+            return size;
         }
-        return size;
+
     } else if (schema->is<node::Array>()) {
         //_deb(elementsToSkip, schema);
+        auto p = tsvFieldsList.what.equal_range(schema->getNumber());
         auto it = parse_items.begin();
-        parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+        if (p.first != p.second) {
+            parse_items.emplace(it, ApplyTsvAsJson(elementsToSkip, p.first, p.second, schema, *this));
+        } else {
+            parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+        }
         return 1;
     } else if (schema->is<node::Map>()) {
         //_deb(elementsToSkip, schema);
+        auto p = tsvFieldsList.what.equal_range(schema->getNumber());
         auto it = parse_items.begin();
-        parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+        if (p.first != p.second) {
+            parse_items.emplace(it, ApplyTsvAsJson(elementsToSkip, p.first, p.second, schema, *this));
+        } else {
+            parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+        }
         return 1;
     } else {
         if (schema->is<node::String>()) {

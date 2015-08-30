@@ -157,13 +157,7 @@ const node::Node *notArrayNorMap(
         const node::Node *node,
         const std::string &path) {
 
-    if (node->isOneOf<node::Array, node::Map, node::Record>()) {
-        throw std::runtime_error(
-            "Sorry, but type '" + node->getTypeName() +
-            "' for field '" + path + "' "
-            "Is not yet supported in tsv expression.");
-
-    } else if (node->is<node::Custom>()) {
+    if (node->is<node::Custom>()) {
         auto &p = node->as<node::Custom>().getDefinition();
         return notArrayNorMap(p.get(), path);
     }

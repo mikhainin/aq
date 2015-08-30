@@ -32,8 +32,13 @@ public:
     Json() : writer(buffer) {
     }
 
+    void WriteName(const node::Node &n) {
+        if (!n.getItemName().empty()) {
+            writer.String(n.getItemName());
+        }
+    }
     void String(const avro::StringBuffer &s, const node::String &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.String(s.data(), s.bytesLeft());
     }
 
@@ -50,32 +55,32 @@ public:
     }
 
     void Int(int i, const node::Int &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.Int(i);
     }
 
     void Long(long l, const node::Long &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.Int64(l);
     }
 
     void Float(float f, const node::Float &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.Double(f);
     }
 
     void Double(double d, const node::Double &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.Double(d);
     }
 
     void Boolean(bool b, const node::Boolean &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.Bool(b);
     }
 
     void Null(const node::Null &n) {
-        writer.String(n.getItemName());
+        WriteName(n);
         writer.Null();
     }
 
@@ -96,31 +101,29 @@ public:
     }
 
     void CustomBegin(const node::Custom &c) {
-        writer.String(c.getItemName());
-        // outStream << indents[level] << c.getItemName();
+        WriteName(c);
     }
 
     void Enum(const node::Enum &e, int index) {
         const auto &value = e[index];
         writer.String(value);
-        // outStream << ": \"" << value  << '"' << std::endl;
     }
 
     void MapBegin(const node::Map &m) {
-        // outStream << "{\n";
-        // level++;
         writer.StartObject();
     }
 
     void MapEnd(const node::Map &m) {
-        // level--;
-        // outStream << indents[level] << "}\n";
         writer.EndObject();
 
     }
 
     void EndDocument(std::function<void(const std::string &)> dumpMethod) {
         dumpMethod(buffer.GetString());
+    }
+
+    std::string GetAsString() {
+        return buffer.GetString();
     }
 
 private:

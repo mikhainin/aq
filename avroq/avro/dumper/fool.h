@@ -29,8 +29,18 @@ constexpr static const char *indents[] = {
 
 class Fool {
 public:
+
+    void WriteName(const node::Node &n) {
+        if (!n.getItemName().empty()) {
+            outStream << n.getItemName() << ": ";
+        }
+    }
+
     void String(const StringBuffer &s, const node::String &n) {
-        outStream << indents[level] << n.getItemName() << ": \"" << s << '"' << std::endl;
+
+        outStream << indents[level];
+        WriteName(n);
+        outStream << " \"" << s << '"' << std::endl;
     }
 
     void MapName(const StringBuffer &name) {
@@ -46,27 +56,39 @@ public:
     }
 
     void Int(int i, const node::Int &n) {
-        outStream << indents[level] << n.getItemName() << ':' << ' ' << i << std::endl;
+        outStream << indents[level];
+        WriteName(n);
+        outStream << i << std::endl;
     }
 
     void Long(long l, const node::Long &n) {
-        outStream << indents[level] << n.getItemName() << ':' << ' ' << l << std::endl;
+        outStream << indents[level];
+        WriteName(n);
+        outStream << l << std::endl;
     }
 
     void Float(float f, const node::Float &n) {
-        outStream << indents[level] << n.getItemName() << ':' << ' ' << f << std::endl;
+        outStream << indents[level];
+        WriteName(n);
+        outStream << f << std::endl;
     }
 
     void Double(double d, const node::Double &n) {
-        outStream << indents[level] << n.getItemName() << ':' << ' ' << d << std::endl;
+        outStream << indents[level];
+        WriteName(n);
+        outStream << d << std::endl;
     }
 
     void Boolean(bool b, const node::Boolean &n) {
-        outStream << indents[level] << n.getItemName() << ':' << ' ' << (b ? "true" : "false") << std::endl;
+        outStream << indents[level];
+        WriteName(n);
+        outStream << (b ? "true" : "false") << std::endl;
     }
 
     void Null(const node::Null &n) {
-        outStream << indents[level] << n.getItemName() << ": null" << std::endl;
+        outStream << indents[level];
+        WriteName(n);
+        outStream << "null" << std::endl;
     }
 
     void RecordBegin(const node::Record &r) {
@@ -91,12 +113,14 @@ public:
     }
 
     void CustomBegin(const node::Custom &c) {
-        outStream << indents[level] << c.getItemName();
+        outStream << indents[level];
+        WriteName(c);
+
     }
 
     void Enum(const node::Enum &e, int index) {
         const auto &value = e[index];
-        outStream << ": \"" << value  << '"' << std::endl;
+        outStream << '"' << value  << '"' << std::endl;
     }
 
     void MapBegin(const node::Map &m) {
