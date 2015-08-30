@@ -5,6 +5,8 @@
 
 #include <boost/lambda/lambda.hpp>
 
+#include <util/onscopeexit.h>
+
 #include <avro/node/all_nodes.h>
 #include <avro/blockdecoder.h>
 #include <avro/exception.h>
@@ -12,6 +14,8 @@
 #include <avro/reader.h>
 
 #include <filter/filter.h>
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include <util/onscopeexit.h>
 
@@ -50,68 +54,20 @@ void FileEmitor::enableParseLoop() {
     parseLoopEnabled = true;
 }
 
+void FileEmitor::outputAsJson(bool pretty) {
+    jsonMode = true;
+    jsonPrettyMode = pretty;
+}
+
 std::shared_ptr<Task> FileEmitor::getNextTask(
     std::unique_ptr<avro::BlockDecoder> &decoder,
     size_t &fileId) {
-/*
-    std::lock_guard<std::mutex> lock(ownLock);
-    if (stop) {
-        return std::shared_ptr<Task>();
-    }
-
-    auto &currentFileName = fileList[currentFile];
-
-    if (!currentTaskSample.reader || currentTaskSample.reader->eof()) {
-
-        if (currentFile >= fileList.size()) {
-            return std::shared_ptr<Task>();
-        }
-
-        if (printProcessingFile) {
-            std::cerr << "Processing " << currentFileName << std::endl;
-        }
-
-        try{
-            currentTaskSample.reader.reset(new avro::Reader(currentFileName));
-        } catch (const std::runtime_error &e) {
-            std::cerr << e.what() << std::endl;
-            stop = true;
-            return std::shared_ptr<Task>();
-        }
-        currentTaskSample.header.reset(
-                new avro::header(currentTaskSample.reader->readHeader())
-            );
-
-        try {
-            currentTaskSample.tsvFieldsList.reset(
-                    new avro::dumper::TsvExpression(
-                        currentTaskSample.reader->compileFieldsList(
-                                tsvFieldList,
-                                *currentTaskSample.header,
-                                fieldSeparator
-                            )
-                    )
-                );
-		} catch (const avro::PathNotFound &e) {
-			return returnStop("Can't apply TSV expression to file: " + currentFileName + "\n"
-							  "path '" + e.getPath() + "' was not found");
-		} catch (const std::runtime_error &e) {
-			return returnStop("Can't apply TSV expression to file: " + currentFileName + "\n" + e.what());
-		}
-
-
-        ++currentFile;
-=======
 
     std::shared_ptr<Task> task;
->>>>>>> threaded_input
 
     if (!queue.pop(task) || stop) {
     	return std::shared_ptr<Task>();
     }
-<<<<<<< HEAD
-*/
-    std::shared_ptr<Task> task;// (new Task(currentTaskSample));
 
     if (!queue.pop(task)) {
     	return std::shared_ptr<Task>();
@@ -129,6 +85,9 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
         if (parseLoopEnabled) {
             decoder->enableParseLoop();
         }
+        if (jsonMode) {
+            decoder->outputAsJson(jsonPrettyMode);
+        }
         if (filter) {
             try {
                 decoder->setFilter(
@@ -140,7 +99,7 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
                 return returnStop("Can't apply filter to file: " + task->currentFileName + "\n"
                                   "path '" + e.getPath() + "' was not found");
             } catch (const std::runtime_error &e) {
-                return returnStop("Can't apply filter to file: " + task->currentFileName + e.what());
+                return returnStop("Can't apply filter to file: " + task->currentFileName +  ":" + e.what());
             }
         }
         try {
@@ -149,7 +108,7 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
             return returnStop("Can't apply TSV expression to file: " + task->currentFileName + "\n"
                               "path '" + e.getPath() + "' was not found");
         } catch (const std::runtime_error &e) {
-            return returnStop("Can't apply TSV expression to file: " + task->currentFileName + "\n" + e.what());
+            return returnStop("Can't apply TSV expression to file: " + task->currentFileName + ": " + e.what());
         }
 
         decoder->setDumpMethod(outDocument);
@@ -192,14 +151,13 @@ const std::string &FileEmitor::getLastError() const {
 }
 
 void FileEmitor::operator()() {
-
 	try {
 		mainLoop();
 	} catch(const std::runtime_error &e) {
-        // TODO: stop processing completely
+		// TODO: stop processing completely
 		stop = true;
-        std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
-    }
+		std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
+	}
 }
 
 void FileEmitor::mainLoop() {
@@ -207,6 +165,7 @@ void FileEmitor::mainLoop() {
 	util::on_scope_exit dothis([this]() {
 			queue.done();
 		});
+
 	size_t currentFileId = 0;
 	for(auto const &currentFileName : fileList) {
 
@@ -219,34 +178,44 @@ void FileEmitor::mainLoop() {
         } catch (const std::runtime_error &e) {
             std::cerr << e.what() << std::endl;
             stop = true;
-            std::cerr << e.what() << std::endl;
             return;
         }
-        currentTaskSample.header.reset(
-                new avro::header(currentTaskSample.reader->readHeader())
-            );
+        auto newHeader = currentTaskSample.reader->readHeader();
+        if (currentTaskSample.header && newHeader == *currentTaskSample.header) {
+            currentTaskSample.header->setSync(newHeader.sync);
+        } else {
 
-        try {
-            currentTaskSample.tsvFieldsList.reset(
-                    new avro::dumper::TsvExpression(
-                        currentTaskSample.reader->compileFieldsList(
-                                tsvFieldList,
-                                *currentTaskSample.header,
-                                fieldSeparator
-                            )
-                    )
+            ++currentFileId;
+
+            currentTaskSample.reader->parseSchema(newHeader);
+
+            currentTaskSample.header.reset(
+                    new avro::header(std::move(newHeader))
                 );
-		} catch (const avro::PathNotFound &e) {
-                    stop = true;
-                    lastError = "Can't apply TSV expression to file: " + currentFileName + "\n"
-	    					  "path '" + e.getPath() + "' was not found";
-                    return;
-		} catch (const std::runtime_error &e) {
-                    lastError = "Can't apply TSV expression to file: " + currentFileName + "\n" + e.what();
-                    stop = true;
-                    return;
-		}
 
+            try {
+                currentTaskSample.tsvFieldsList.reset(
+                        new avro::dumper::TsvExpression(
+                            currentTaskSample.reader->compileFieldsList(
+                                    tsvFieldList,
+                                    *currentTaskSample.header,
+                                    fieldSeparator
+                                )
+                        )
+                    );
+            } catch (const avro::PathNotFound &e) {
+                stop = true;
+                lastError = "Can't apply TSV expression to file: " + currentFileName + "\n"
+                                             "path '" + e.getPath() + "' was not found";
+                return;
+            } catch (const std::runtime_error &e) {
+                stop = true;
+                lastError = "Can't apply TSV expression to file: " + currentFileName + "\n" + e.what();
+
+                return;
+            }
+
+        }
 		currentTaskSample.currentFileName = currentFileName;
 
 		while(!currentTaskSample.reader->eof()) {
@@ -261,22 +230,10 @@ void FileEmitor::mainLoop() {
 		            task->objectCount
 		        )
 		    ));
-
-            currentTaskSample.tsvFieldsList.reset(
-                    new avro::dumper::TsvExpression(
-                        currentTaskSample.reader->compileFieldsList(
-                                tsvFieldList,
-                                *currentTaskSample.header,
-                                fieldSeparator
-                            )
-                    )
-                );
-
 			if (!queue.push(task)) {
 				return;
 			}
 		}
 
-		++currentFileId;
 	}
 }

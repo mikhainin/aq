@@ -72,6 +72,8 @@ int main(int argc, const char * argv[]) {
     bool countMode = false;
     bool disableParseLoop = false;
     bool displayVersionAndExit = false;
+    bool jsonMode = false;
+    bool jsonPrettyMode = false;
     std::string fieldSeparator = "\t";
 
     po::options_description desc("Allowed options");
@@ -85,6 +87,8 @@ int main(int argc, const char * argv[]) {
         ("count-only", po::bool_switch(&countMode), "Count of matched records, don't print them")
         ("record-separator", po::value<std::string>(&recordSeparator)->default_value("\\n"), "Record separator (\\n by default)")
         ("field-separator", po::value<std::string>(&fieldSeparator)->default_value("\\t"), "Field separator for TSV output (\\t by default)")
+        ("json", po::bool_switch(&jsonMode), "Output in JSON format")
+        ("jp", po::bool_switch(&jsonPrettyMode), "Output in JSON format (prettified)")
         ("disable-parse-loop", po::bool_switch(&disableParseLoop), "Disable experimental parsing mode (enabled by default)")
         ("help,h", "Show help message")
         ("version", po::bool_switch(&displayVersionAndExit), "Display version and exit")
@@ -110,6 +114,11 @@ int main(int argc, const char * argv[]) {
     if (displayVersionAndExit) {
         std::cout << "aq version: " << avroqVersion() << std::endl;
         return 0;
+    }
+
+    if ((jsonMode || jsonPrettyMode) && !fields.empty()) {
+        std::cout << "arguments --json/--jp and --fields should not be set simultaneously"<< std::endl;
+        return 1;
     }
 
     updateSeparator(recordSeparator);
@@ -144,6 +153,9 @@ int main(int argc, const char * argv[]) {
         }
         if ( ! disableParseLoop ) {
             emitor.enableParseLoop();
+        }
+        if (jsonMode || jsonPrettyMode) {
+            emitor.outputAsJson(jsonPrettyMode);
         }
         std::vector<std::thread> workers;
 

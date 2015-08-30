@@ -1,7 +1,9 @@
 #include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
 
+#include "detail/astrunner.h"
 #include "equality_expression.h"
+#include "record_expression.h"
 
 #include "filter.h"
 
@@ -14,73 +16,80 @@ struct ExpressionExtractor
 
     typedef void result_type;
 
-    ExpressionExtractor(Filter &filter) : filter(filter){
+    ExpressionExtractor(std::vector<equality_expression*> &list) : list(list){
     }
 
-    void operator()(qi::info::nil_) const {}
-    void operator()(int n) const { std::cout << n; }
-    void operator()(const std::string &s) const { std::cout << s; }
-    void operator()(equality_expression &s) const {
-        filter.addExpression(s);
+    void operator()(qi::info::nil_) {}
+    void operator()(int n) { std::cout << n; }
+    void operator()(const std::string &s) { std::cout << s; }
+    void operator()(equality_expression &s) {
+        // filter.addExpression(s);
+        list.push_back(&s);
+    }
+    void operator()(record_expression &r) {
+        // boost::apply_visitor(*this, r.ast.expr);
+        //filter.addExpression(s);
+        // TODO: implement me
     }
 
-    void operator()(const nil &) const {  }
+    void operator()(const nil &) {  }
 
-    void operator()(detail::expression_ast& ast) const
+    void operator()(detail::expression_ast& ast)
     {
         boost::apply_visitor(*this, ast.expr);
     }
-    void operator()(detail::binary_op& expr) const
+    void operator()(detail::binary_op& expr)
     {
         boost::apply_visitor(*this, expr.left.expr);
         boost::apply_visitor(*this, expr.right.expr);
     }
-    void operator()(detail::not_op& expr) const
+    void operator()(detail::not_op& expr)
     {
         boost::apply_visitor(*this, expr.expr.expr);
     }
 
-    Filter &filter;
+    std::vector<equality_expression*> &list;
 };
 
-
-struct AstRunner
+struct RecordExtractor
 {
 
-    typedef bool result_type;
+    typedef void result_type;
 
-    AstRunner() {
+    RecordExtractor(std::vector<record_expression*> &list)
+        : list(list) {
     }
 
-    bool operator()(qi::info::nil_) const { return false; }
-    bool operator()(int n) const { assert(false); return false; }
-    bool operator()(const std::string &s) const { assert(false); return false; }
-    bool operator()(const nil &) const { assert(false); return false; }
-
-    bool operator()(const equality_expression &s) const {
-        return s.getState();
+    void operator()(qi::info::nil_) {}
+    void operator()(int n) { std::cout << n; }
+    void operator()(const std::string &s) { std::cout << s; }
+    void operator()(equality_expression &s) {
+        // filter.addExpression(s);
+    }
+    void operator()(record_expression &r) {
+        // boost::apply_visitor(*this, r.ast.expr);
+        //filter.addExpression(s);
+        // TODO: implement me
+        list.push_back(&r);
     }
 
-    bool operator()(detail::expression_ast const& ast) const
+    void operator()(const nil &) {  }
+
+    void operator()(detail::expression_ast& ast)
     {
-        return boost::apply_visitor(*this, ast.expr);
+        boost::apply_visitor(*this, ast.expr);
+    }
+    void operator()(detail::binary_op& expr)
+    {
+        boost::apply_visitor(*this, expr.left.expr);
+        boost::apply_visitor(*this, expr.right.expr);
+    }
+    void operator()(detail::not_op& expr)
+    {
+        boost::apply_visitor(*this, expr.expr.expr);
     }
 
-    bool operator()(detail::binary_op const& expr) const
-    {
-        if (expr.op == detail::binary_op::AND) {
-            return boost::apply_visitor(*this, expr.left.expr) &&
-                boost::apply_visitor(*this, expr.right.expr);
-        } else {
-            return boost::apply_visitor(*this, expr.left.expr) ||
-                boost::apply_visitor(*this, expr.right.expr);
-        }
-    }
-    bool operator()(detail::not_op const& expr) const
-    {
-        return !boost::apply_visitor(*this, expr.expr.expr);
-    }
-
+    std::vector<record_expression*> &list;
 };
 
 struct ExpressionResetter
@@ -104,6 +113,10 @@ struct ExpressionResetter
     {
         boost::apply_visitor(*this, ast.expr);
     }
+    void operator()(record_expression & r) const {
+        boost::apply_visitor(*this, r.ast.expr);
+        r.resetState();
+    }
     void operator()(detail::binary_op& expr) const
     {
         boost::apply_visitor(*this, expr.left.expr);
@@ -116,33 +129,60 @@ struct ExpressionResetter
 };
 
 Filter::Filter(const detail::expression_ast &ast) : ast(ast) {
-    ExpressionExtractor extractor(*this);
+    ExpressionExtractor extractor(predicateList);
     extractor(this->ast);
 }
 
 Filter::Filter(const Filter& oldFilter) : ast(oldFilter.ast) {
-    ExpressionExtractor extractor(*this);
+    ExpressionExtractor extractor(predicateList);
     extractor(this->ast);
 }
 
 bool Filter::expressionPassed() const {
-    AstRunner runner;
+    detail::AstRunner runner;
     return runner(ast);
 }
 
-void Filter::addExpression(equality_expression&expr) {
-    predicateList.push_back(&expr);
+std::vector<record_expression*> Filter::getRecordExpressions() {
+    std::vector<record_expression*> list;
+
+    RecordExtractor getRecords(list);
+    getRecords(ast);
+
+    return list;
 }
 
-std::vector<std::string> Filter::getUsedPaths() const {
-    std::vector<std::string> result;
+std::vector<equality_expression*> Filter::getPredicates(record_expression*r) {
 
-    for(const auto *const expr : predicateList) {
-        result.emplace_back(expr->identifier);
-    }
+    std::vector<equality_expression*> list;
 
-    return result;
+    ExpressionExtractor extractor(list);
+    extractor(r->ast);
+
+    return list;
+
 }
+
+std::vector<record_expression*> Filter::getRecordExpressions(equality_expression*e) {
+
+    std::vector<record_expression*> list;
+
+    RecordExtractor getRecords(list);
+    getRecords(*e);
+
+    return list;
+}
+
+std::vector<record_expression*> Filter::getRecordExpressions(record_expression*r) {
+    std::vector<record_expression*> list;
+
+    RecordExtractor getRecords(list);
+    getRecords(*r);
+
+    return list;
+
+}
+
 
 const std::vector<equality_expression*> &Filter::getPredicates() {
     return predicateList;

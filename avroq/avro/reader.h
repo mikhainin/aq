@@ -24,6 +24,8 @@ public:
 
     header readHeader();
 
+    void parseSchema(header &header);
+
     void nextBlock(const header &header, avro::Block &block);
     avro::StringBuffer nextBlock(const header &header, int64_t &objectCountInBlock );
 

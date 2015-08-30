@@ -14,6 +14,8 @@
 #include "detail/ast.hpp"
 #include "compiler.h"
 #include "equality_expression.h"
+#include "record_expression.h"
+
 #include "filter.h"
 #include "string_operator.h"
 
@@ -250,10 +252,21 @@ namespace client
                        )
                 ;
 
+            record_expr =
+                ( array_expression           [_val =  _1]
+                | identifier                 [_val =  _1]
+                )
+                    > '(' > logical_expression [_val &=  _1] > ')';
+
             braces_expr =
                   '(' >> logical_expression   [_val = _1] >> ')'
+                | lit("not") >> (
+                      equality_expr           [_val != _1]
+                    | record_expr             [_val != _1]
+                    )
                 | equality_expr               [_val = _1]
-                | lit("not") >> equality_expr [_val != _1];
+                | record_expr                 [_val = _1]
+                ;
 
             logical_expression =
                     braces_expr                 [_val = _1]
@@ -280,6 +293,7 @@ namespace client
         quoted_string<Iterator> quoted_string_;
         qi::rule<Iterator, std::string(), ascii::space_type> identifier;
         qi::rule<Iterator, detail::array_element(), ascii::space_type> array_expression;
+        qi::rule<Iterator, record_expression(), ascii::space_type> record_expr;
 
     };
 
@@ -301,23 +315,16 @@ std::shared_ptr<Filter> Compiler::compile(const std::string &str) {
 
     std::string::const_iterator iter = str.begin();
     std::string::const_iterator end = str.end();
-    detail::expression_ast ast; // = std::make_shared<detail::expression_ast>();
+    detail::expression_ast ast;
     // ast_print printer;
-    calculator calc; // Our grammar
+    calculator calc;
     bool r = phrase_parse(iter, end, calc, space, ast);
 
-    if (r && iter == end)
-    {
-        // std::cout << "-------------------------\n";
-        // std::cout << "Parsing succeeded\n";
-        // printer(ast);
-        // std::cout << "\n-------------------------\n";
-    }
-    else
-    {
+    if (!r || iter != end) {
         std::string rest(iter, end);
         throw CompileError(rest);
     }
+    // std::cout << "Compile ok" << std::endl;
     return std::make_shared<Filter>(ast);
 }
 

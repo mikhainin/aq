@@ -2,6 +2,7 @@
 #define __avroq__avro_typeparser__
 
 #include "zigzag.hpp"
+#include "stringbuffer.h"
 
 namespace avro {
 

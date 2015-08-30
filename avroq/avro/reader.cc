@@ -70,11 +70,6 @@ header Reader::readHeader() {
 
     }
 
-    SchemaReader schemaReader(header.metadata["avro.schema"]);
-    header.schema = schemaReader.parse();
-    header.nodesNumber = schemaReader.nodesNumber();
-    // dumpSchema(header.schema);
-    
     char c = d->input->getChar();
 
     assert(c == 0); // Avro Map is over, no more elements
@@ -83,6 +78,13 @@ header Reader::readHeader() {
 
     return header;
 
+}
+
+void Reader::parseSchema(header &header) {
+    SchemaReader schemaReader(header.metadata["avro.schema"]);
+    header.schema = schemaReader.parse();
+    header.nodesNumber = schemaReader.nodesNumber();
+    // dumpSchema(header.schema);
 }
 
 avro::StringBuffer Reader::nextBlock(const header &header, int64_t &objectCountInBlock ) {
@@ -153,19 +155,11 @@ void Reader::dumpSchema(const std::unique_ptr<node::Node> &schema, int level) co
     }
 }
 
-const node::Node *notArrayNorMap(
-        const node::Node *node,
-        const std::string &path) {
+const node::Node *notCustom(const node::Node *node) {
 
-    if (node->isOneOf<node::Array, node::Map, node::Record>()) {
-        throw std::runtime_error(
-            "Sorry, but type '" + node->getTypeName() +
-            "' for field '" + path + "' "
-            "Is not yet supported in tsv expression.");
-
-    } else if (node->is<node::Custom>()) {
+    if (node->is<node::Custom>()) {
         auto &p = node->as<node::Custom>().getDefinition();
-        return notArrayNorMap(p.get(), path);
+        return notCustom(p.get());
     }
     return node;
 }
@@ -188,19 +182,15 @@ dumper::TsvExpression Reader::compileFieldsList(const std::string &filedList, co
         // allow to insert spaces in TSV expression, ala " uuid, request.ip , request.uri "
         boost::algorithm::trim(*p);
 
-        auto node = schemaNodeByPath(*p, header);
+        auto node = notCustom(schemaNodeByPath(*p, header));
 
-        if (node->is<node::Custom>()) {
-            node = node->as<node::Custom>().getDefinition().get();
-        }
-
-        result.what.insert(std::make_pair(
-            notArrayNorMap(node, *p)->getNumber(), result.pos));
+        result.what.insert(
+                std::make_pair(node->getNumber(), result.pos));
 
         if (node->is<node::Union>()) {
             for( auto &n : node->as<node::Union>().getChildren()) {
                 result.what.insert(
-                    std::make_pair(notArrayNorMap(n.get(), *p)->getNumber(), result.pos));
+                    std::make_pair(notCustom(n.get())->getNumber(), result.pos));
             }
         }
         result.pos++;

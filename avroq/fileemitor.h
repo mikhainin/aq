@@ -51,6 +51,7 @@ public:
     size_t getCountedDocuments() const;
 
     const std::string &getLastError() const;
+    void outputAsJson(bool pretty);
 
     void operator()();
 
@@ -69,6 +70,8 @@ private:
     bool stop = false;
     bool countMode = false;
     bool parseLoopEnabled = false;
+    bool jsonMode = false;
+    bool jsonPrettyMode = false;
     std::string lastError;
 
     util::conqurrent_queue<std::shared_ptr<Task>> queue;

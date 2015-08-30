@@ -2,7 +2,6 @@
 #define __filter__filter__
 
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "detail/ast.hpp"
@@ -13,6 +12,7 @@ namespace detail {
     struct expression_ast;
 }
 struct equality_expression;
+struct record_expression;
 
 class Filter {
     Filter() = delete;
@@ -20,9 +20,13 @@ public:
     explicit Filter(const detail::expression_ast &ast);
     explicit Filter(const Filter& oldFilter);
 
-    void addExpression(equality_expression &expr);
-    std::vector<std::string> getUsedPaths() const;
     const std::vector<equality_expression*> &getPredicates();
+    std::vector<record_expression*> getRecordExpressions();
+
+    std::vector<equality_expression*> getPredicates(record_expression*r);
+    std::vector<record_expression*> getRecordExpressions(equality_expression*e);
+    std::vector<record_expression*> getRecordExpressions(record_expression*r);
+
     bool expressionPassed() const;
     void resetState();
 private:

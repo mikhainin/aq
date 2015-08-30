@@ -8,6 +8,7 @@ add_library(avro
                  exception.cc
                  deflatedbuffer.cc
                  filehandler.cc
+                 header.cc
                  limiter.cc
                  reader.cc
                  schemareader.cc

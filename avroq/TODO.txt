@@ -2,6 +2,10 @@ v0.1
 ====
 print path to corrupted file
 
+v0.2
+====
+
+
 TODO
 ====
 print names/values in columns (to be able to copy field names)
@@ -11,20 +15,19 @@ check condition after last used schema node
 tail mode
 progressbar
 don't create threads if file size is small
-don't recreate header.schema, filter expression, tsv expression if schema is not changed
-"less" mode, aq | less, that extracts only first block, or n elements and waits while user wants more
+"less" mode, `aq | less', that extracts only first block, or n elements and waits while user wants more
 print column names in tsv-mode
-remove ":" when printing arrays
 field.* notation
-add array expressions for complex types
-[bug] log_files[0]:contains("nobid") syntax doesn't work when log_files[any]:contains("nobid") is okay
+[bug] record print in TSV mode doesn't work with --disable-print-loop
+[bug] can't print record in TSV mode and it's subfield
+read from STDIN
+recursive directory traversal
 
 Long term TODO
 ==============
 query JSON
 query protobuf
 print protobuf content
-display as JSON
 select fields to print (for non-TSV output)
 AVRO as output format
 

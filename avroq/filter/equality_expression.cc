@@ -1,21 +1,26 @@
 #include <util/algorithm.h>
 #include "detail/ast.hpp"
+
+#include "record_expression.h"
 #include "equality_expression.h"
 
 
 namespace filter {
 
-equality_expression::equality_expression() {
+equality_expression::equality_expression() : state() {
 }
 
 equality_expression::equality_expression(const std::string &ident) :
+    state(),
     identifier(ident) {
 }
 
 equality_expression::equality_expression(const detail::array_element &ident) :
-    identifier(ident.identifier),
-    is_array_element(true),
-    array_index(ident.index) {
+    state(),
+    identifier(ident.identifier) {
+
+    is_array_element = true;
+    array_index = ident.index;
 }
 
 equality_expression& equality_expression::operator == (const type &constant) {
@@ -76,7 +81,7 @@ equality_expression& equality_expression::operator |= (const type &constant) {
     return *this;
 }
 
-
+/*
 void equality_expression::resetState() {
     state = false;
     array_states.clear();
@@ -113,6 +118,14 @@ bool equality_expression::getState() const {
 
 void equality_expression::pushState() {
     array_states.push_back(state);
+}
+*/
+void equality_expression::setParent(record_expression * parent) {
+
+    assert(parent && "parent cannot be null");
+    this->parent = parent;
+    // identifier = parent->identifier + '.' + identifier;
+
 }
 
 

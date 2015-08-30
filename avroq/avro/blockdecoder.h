@@ -5,6 +5,8 @@
 #include <unordered_map>
 
 #include "dumper/tsvexpression.h"
+#include "predicate/list.h"
+
 
 namespace filter {
     class Filter;
@@ -25,16 +27,17 @@ namespace node {
 }
 namespace predicate {
     class Predicate;
+    class List;
 }
 
 class BlockDecoder {
     friend class SkipArray;
     friend class ApplyArray;
+    friend class ApplyTsvAsJson;
     friend class SkipMap;
     using parse_func_t = std::function<int(DeflatedBuffer &)>;
     using dump_tsv_func_t = std::function<int(DeflatedBuffer &, dumper::Tsv &t)>;
 public:
-    using filter_items_t = std::unordered_multimap<const node::Node *, std::shared_ptr<predicate::Predicate>>;
     using const_node_t = const std::unique_ptr<node::Node>;
 
     BlockDecoder(const struct header &header, Limiter &limit);
@@ -46,19 +49,22 @@ public:
     void setCountMethod(std::function<void(size_t)> coutMethod);
     void enableCountOnlyMode();
     void enableParseLoop();
+    void outputAsJson(bool pretty);
 
 private:
     const struct header &header;
     Limiter &limit;
     dumper::TsvExpression tsvFieldsList;
-    std::unique_ptr<filter::Filter> filter;
-    filter_items_t filterItems;
+    std::unique_ptr<predicate::List> predicates;
+
     std::function<void(const std::string &)> dumpMethod;
     std::function<void(size_t)> coutMethod;
     bool countOnly = false;
     bool parseLoopEnabled = false;
     std::vector<parse_func_t> parseLoop;
     std::vector<dump_tsv_func_t> tsvDumpLoop;
+    bool jsonMode = false;
+    bool jsonPrettyMode = false;
 
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 
@@ -72,8 +78,6 @@ private:
 
     template <typename T>
     typename T::result_type convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const;
-
-    const node::Node* schemaNodeByPath(const std::string &path);
 
     int compileFilteringParser(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int elementsToSkip = 1);
 

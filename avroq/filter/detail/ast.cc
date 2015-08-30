@@ -1,3 +1,5 @@
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include "ast.hpp"
 

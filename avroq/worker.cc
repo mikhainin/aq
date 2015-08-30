@@ -1,4 +1,5 @@
 #include <memory>
+#include <iostream>
 
 #include <avro/block.h>
 #include <avro/blockdecoder.h>
@@ -8,6 +9,8 @@
 #include <avro/codec/create.h>
 
 #include <filter/filter.h>
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
 #include "fileemitor.h"
 
@@ -52,7 +55,7 @@ void Worker::operator()() {
         	emitor.finished();
             break;
         } catch(const std::runtime_error &e) {
-            // TODO: stop processing completely
+        	emitor.finished();
             std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
             break;
         }

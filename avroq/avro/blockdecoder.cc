@@ -1,12 +1,15 @@
 
 #include <filter/filter.h>
+#include <filter/equality_expression.h>
+#include <filter/record_expression.h>
 
-#include "dumper/tsv.h"
 #include "dumper/fool.h"
+#include "dumper/json.h"
+#include "dumper/tsv.h"
 
 #include "node/all_nodes.h"
-#include "node/nodebypath.h"
 
+#include "predicate/list.h"
 #include "predicate/predicate.h"
 
 #include "block.h"
@@ -24,223 +27,15 @@ namespace avro {
 BlockDecoder::BlockDecoder(const struct header &header, Limiter &limit) : header(header), limit(limit) {
 }
 
-namespace {
-
-    struct TypeName {
-        TypeName(const std::string &name)
-            : name(name) {
-        }
-
-        std::string name;
-    };
-
-    template <typename T>
-    struct ThowTypeName {
-        using result_type = T;
-
-        T operator() (double) const {
-            throw TypeName("double");
-        }
-        T operator() (float) const {
-            throw TypeName("float");
-        }
-        T operator() (int) const {
-            throw TypeName("int");
-        }
-        T operator() (const std::string &) const {
-            throw TypeName("string");
-        }
-
-        T operator() (bool) const {
-            throw TypeName("bool");
-        }
-        template <typename AgrgType>
-        T operator() (const AgrgType&) const {
-            throw TypeName(std::string("Unknown type:") + typeid(AgrgType).name());
-        }
-    };
-
-    template <>
-    double ThowTypeName<double>::operator() (double d) const {
-        return d;
-    }
-    template <>
-    double ThowTypeName<double>::operator() (float f) const {
-        return f;
-    }
-    template <>
-    double ThowTypeName<double>::operator() (int i) const {
-        return i;
-    }
-
-    using ToDouble = ThowTypeName<double>;
-
-
-    template <>
-    float ThowTypeName<float>::operator() (double d) const {
-        return d;
-    }
-    template <>
-    float ThowTypeName<float>::operator() (float f) const {
-        return f;
-    }
-    template <>
-    float ThowTypeName<float>::operator() (int i) const {
-        return i;
-    }
-
-    using ToFloat = ThowTypeName<float>;
-
-
-    template <>
-    int ThowTypeName<int>::operator() (double d) const {
-        return d;
-    }
-    template <>
-    int ThowTypeName<int>::operator() (float f) const {
-        return f;
-    }
-    template <>
-    int ThowTypeName<int>::operator() (int i) const {
-        return i;
-    }
-
-    using ToInt = ThowTypeName<int>;
-
-
-    template <>
-    std::string ThowTypeName<std::string>::operator() (const std::string &s) const {
-        return s;
-    }
-
-    using ToString = ThowTypeName<std::string>;
-
-
-    template <>
-    bool ThowTypeName<bool>::operator() (bool b) const {
-        return b;
-    }
-
-    using ToBoolean = ThowTypeName<bool>;
-
-
-}
 
 void BlockDecoder::setFilter(std::unique_ptr<filter::Filter> flt) {
-    filter = std::move(flt);
 
-    for(auto &filterPredicate : filter->getPredicates()) {
-        const node::Node * filterNode = schemaNodeByPath(filterPredicate->identifier);
-
-        if (filterNode->is<node::Custom>()) {
-            filterNode = filterNode->as<node::Custom>().getDefinition().get();
-        }
-        if (filterNode->is<node::Union>()) {
-            for( auto &p : filterNode->as<node::Union>().getChildren()) {
-                if (filterPredicate->op == filter::equality_expression::IS_NIL ||
-                    filterPredicate->op == filter::equality_expression::NOT_NIL
-                ) {
-                    if (!filterNode->as<node::Union>().containsNull()) {
-                        throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
-                    }
-
-                    // TODO lookup for index of NULL-node in the union
-
-                    break;
-                }
-
-                filterNode = p.get();
-
-                if (filterNode->is<node::Custom>()) {
-                    filterNode = filterNode->as<node::Custom>().getDefinition().get();
-                }
-                if (filterNode->isOneOf<
-                            node::Array,
-                            node::Boolean,
-                            node::Double,
-                            node::Enum,
-                            node::Float,
-                            node::Int,
-                            node::Long,
-                            node::String
-                            >()) {
-                    break;
-                }
-            }
-        } else {
-            if (filterPredicate->op == filter::equality_expression::IS_NIL ||
-                filterPredicate->op == filter::equality_expression::NOT_NIL
-            ) {
-                throw std::runtime_error("Field '" + filterPredicate->identifier + "' can not be null");
-            }
-        }
-
-        if (filterNode->is<node::Array>()) {
-            // put predicate on both items: on array and on element
-            filterItems.insert(
-                    std::make_pair(
-                        filterNode,
-                        std::make_shared<predicate::Predicate>(filterPredicate)
-                    )
-                );
-
-            filterNode = filterNode->as<node::Array>().getItemsType().get();
-
-            if (filterNode->is<node::Union>()) {
-                throw std::runtime_error("Only arrays of primitive types are supported. "
-                 "Can't process field '" + filterPredicate->identifier + "'");
-            }
-        }
-
-        if (filterNode->isOneOf<node::Union>()) {
-            ; // ok, acceptable only for isnil/notnil operations
-        } else if (filterNode->is<node::Enum>()) {
-            auto const &e = filterNode->as<node::Enum>();
-            int i = e.findIndexForValue(boost::get<std::string>(filterPredicate->constant));
-            if (i == -1) {
-                // TODO: add list of valid values
-                throw std::runtime_error("Invalid value for enum field '" + filterPredicate->identifier + "'");
-            }
-            filterPredicate->constant = i;
-        } else if (filterNode->is<node::String>()) {
-            filterPredicate->constant = convertFilterConstant<ToString>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Boolean>()) {
-            filterPredicate->constant = convertFilterConstant<ToBoolean>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Double>()) {
-            filterPredicate->constant = convertFilterConstant<ToDouble>(filterPredicate, filterNode);
-        } else if (filterNode->is<node::Float>()) {
-            filterPredicate->constant = convertFilterConstant<ToFloat>(filterPredicate, filterNode);
-        } else if (filterNode->isOneOf<node::Int, node::Long>()) {
-            filterPredicate->constant = convertFilterConstant<ToInt>(filterPredicate, filterNode);
-        } else {
-            throw std::runtime_error(
-                "Sorry, but type '" + filterNode->getTypeName() +
-                "' for field '" + filterPredicate->identifier + "' "
-                "Is not yet supported in filter expression.");
-        }
-        filterItems.insert(
-                std::make_pair(
-                    filterNode,
-                    std::make_shared<predicate::Predicate>(filterPredicate)
-                )
-            );
-    }
+    predicates.reset(new predicate::List(std::move(flt), header.schema.get()));
 
     if (parseLoopEnabled) {
         compileFilteringParser(parseLoop, header.schema);
     }
 
-}
-
-template <typename T>
-typename T::result_type BlockDecoder::convertFilterConstant(const filter::equality_expression* expr, const node::Node *filterNode) const {
-    try {
-        return boost::apply_visitor(T(), expr->constant);
-    } catch(const TypeName &e) {
-        throw std::runtime_error("Invalid type for field '" + expr->identifier + "'"
-            + " expected: " + filterNode->getTypeName() + ", got: " +
-            e.name);
-    }
 }
 
 void BlockDecoder::setTsvFilterExpression(const dumper::TsvExpression &tsvFieldsList) {
@@ -267,10 +62,17 @@ void BlockDecoder::enableParseLoop() {
     parseLoopEnabled = true;
 }
 
+void BlockDecoder::outputAsJson(bool pretty) {
+    jsonMode = true;
+    if (pretty) {
+        jsonPrettyMode = true;
+    }
+}
+
 
 void BlockDecoder::decodeAndDumpBlock(Block &block) {
 
-    if (countOnly && !filter) {
+    if (countOnly && !predicates) {
         // TODO: count without decompression
         coutMethod(block.objectCount);
         return;
@@ -295,15 +97,15 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
             decodeDocument(block.buffer, header.schema);
         }
 
-        if (!filter || filter->expressionPassed()) {
+        if (!predicates || predicates->expressionPassed()) {
 
             limit.documentFinished();
 
             dumpDocument(block);
 
-            if(filter) {
-                filter->resetState();
-            }
+        }
+        if(predicates) {
+            predicates->resetState();
         }
     }
 
@@ -329,6 +131,16 @@ void BlockDecoder::dumpDocument(Block &block) {
             dumpDocument(block.buffer, header.schema, dumper);
         }
         dumper.EndDocument(dumpMethod);
+    } else if (jsonMode) {
+        if (jsonPrettyMode) {
+            dumper::Json<dumper::JsonTag::pretty> dumper;
+            dumpDocument(block.buffer, header.schema, dumper);
+            dumper.EndDocument(dumpMethod);
+        } else {
+            dumper::Json<dumper::JsonTag::plain> dumper;
+            dumpDocument(block.buffer, header.schema, dumper);
+            dumper.EndDocument(dumpMethod);
+        }
     } else {
         dumper::Fool dumper;
         dumpDocument(block.buffer, header.schema, dumper);
@@ -344,13 +156,25 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         for(auto &p : schema->as<node::Record>().getChildren()) {
             decodeDocument(stream, p);
         }
+        if (predicates) {
+            auto range = predicates->getEqualRange(schema.get());
+            if (range.first != range.second) {
+                for_each (
+                    range.first,
+                    range.second,
+                    [](const auto& filterItem){
+                        filterItem.second->recordEnd();
+                    }
+                );
+            }
+        }
     } else if (schema->is<node::Union>()) {
         int item = TypeParser<int>::read(stream);
         const auto &node = schema->as<node::Union>().getChildren()[item];
         decodeDocument(stream, node);
 
-        if (filter) {
-            auto range = filterItems.equal_range(schema.get());
+        if (predicates) {
+            auto range = predicates->getEqualRange(schema.get());
             if (range.first != range.second) {
                 for_each (
                     range.first,
@@ -373,9 +197,9 @@ void BlockDecoder::decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<
         do {
             objectsInBlock = TypeParser<int>::read(stream);
 
-            decltype(filterItems.equal_range(schema.get())) range;
-            if (filter) {
-                range = filterItems.equal_range(schema.get());
+            decltype(predicates->getEqualRange(schema.get())) range;
+            if (predicates) {
+                range = predicates->getEqualRange(schema.get());
             }
             for(int i = 0; i < objectsInBlock; ++i) {
                 decodeDocument(stream, node);
@@ -434,8 +258,8 @@ class ApplyUnion {
 public:
     explicit ApplyUnion(
                     int ret,
-                    BlockDecoder::filter_items_t::iterator start,
-                    BlockDecoder::filter_items_t::iterator end,
+                    predicate::List::filter_items_t::iterator start,
+                    predicate::List::filter_items_t::iterator end,
                     int nullIndex,
                     std::vector<int> &skipping)
         : ret(ret),
@@ -456,8 +280,8 @@ public:
     }
 private:
     int ret;
-    BlockDecoder::filter_items_t::iterator start;
-    BlockDecoder::filter_items_t::iterator end;
+    predicate::List::filter_items_t::iterator start;
+    predicate::List::filter_items_t::iterator end;
     int nullIndex;
     std::vector<int> skipping;
 };
@@ -502,7 +326,7 @@ private:
 
 class ApplyString {
 public:
-    explicit ApplyString(int ret, BlockDecoder::filter_items_t::iterator start, BlockDecoder::filter_items_t::iterator end)
+    explicit ApplyString(int ret, predicate::List::filter_items_t::iterator start, predicate::List::filter_items_t::iterator end)
         : ret(ret),
           start(start),
           end(end) {
@@ -519,14 +343,14 @@ public:
     }
 private:
     int ret;
-    BlockDecoder::filter_items_t::iterator start;
-    BlockDecoder::filter_items_t::iterator end;
+    predicate::List::filter_items_t::iterator start;
+    predicate::List::filter_items_t::iterator end;
 };
 
 template <typename T>
 class Apply {
 public:
-    explicit Apply(int ret, BlockDecoder::filter_items_t::iterator start, BlockDecoder::filter_items_t::iterator end)
+    explicit Apply(int ret, predicate::List::filter_items_t::iterator start, predicate::List::filter_items_t::iterator end)
         : ret(ret),
           start(start),
           end(end) {
@@ -543,8 +367,8 @@ public:
     }
 private:
     int ret;
-    BlockDecoder::filter_items_t::iterator start;
-    BlockDecoder::filter_items_t::iterator end;
+    predicate::List::filter_items_t::iterator start;
+    predicate::List::filter_items_t::iterator end;
 };
 
 
@@ -599,8 +423,8 @@ class ApplyArray {
 public:
 
     explicit ApplyArray(int ret,
-        BlockDecoder::filter_items_t::iterator start,
-        BlockDecoder::filter_items_t::iterator end,
+        predicate::List::filter_items_t::iterator start,
+        predicate::List::filter_items_t::iterator end,
         BlockDecoder::const_node_t &schema,
         BlockDecoder &decoder)
         : ret(ret),
@@ -634,8 +458,40 @@ private:
     int ret;
     BlockDecoder::const_node_t &nodeType;
     BlockDecoder &decoder;
-    BlockDecoder::filter_items_t::iterator start;
-    BlockDecoder::filter_items_t::iterator end;
+    predicate::List::filter_items_t::iterator start;
+    predicate::List::filter_items_t::iterator end;
+};
+
+
+
+class ApplyRecord {
+public:
+
+    explicit ApplyRecord(int ret,
+        predicate::List::filter_items_t::iterator start,
+        predicate::List::filter_items_t::iterator end)
+        : ret(ret),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream) {
+
+        for_each (
+            start, end,
+            [](const auto& filterItem){
+                filterItem.second->recordEnd();
+            }
+        );
+        return ret;
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        (void)tsv;
+        return operator() (stream);
+    }
+private:
+    int ret;
+    predicate::List::filter_items_t::iterator start;
+    predicate::List::filter_items_t::iterator end;
 };
 
 
@@ -676,7 +532,7 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
 
         const auto &u = schema->as<node::Union>();
 
-        size_t nullIndex = -1; // u.nullIndex();
+        size_t nullIndex = -1;
 
         auto size = u.getChildren().size();
 
@@ -701,8 +557,15 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
     } else if (schema->is<node::Custom>()) {
         return compileFilteringParser(parse_items, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Record>()) {
+            if (predicates) {
+                auto range = predicates->getEqualRange(schema.get());
+                if (range.first != range.second) {
+                    auto it = parse_items.begin();
+                    parse_items.emplace(it, ApplyRecord(elementsToSkip, range.first, range.second));
+                }
+            }
         auto &children = schema->as<node::Record>().getChildren();
-        size_t size = 0;
+        size_t size = 1;
         for(auto c = children.rbegin(); c != children.rend(); ++c) {
             size += compileFilteringParser(parse_items, *c);
         }
@@ -710,8 +573,8 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
     } else if (schema->is<node::Array>()) {
 
             auto it = parse_items.begin();
-            if (filter) {
-                auto range = filterItems.equal_range(schema.get());
+            if (predicates) {
+                auto range = predicates->getEqualRange(schema.get());
                 if (range.first != range.second) {
                     parse_items.emplace(it, ApplyArray(elementsToSkip, range.first, range.second, schema->as<node::Array>().getItemsType(), *this));
                     return 1;
@@ -752,8 +615,8 @@ int BlockDecoder::compileFilteringParser(std::vector<parse_func_t> &parse_items,
 template <typename SkipType, typename ApplyType, typename... Args>
 void BlockDecoder::skipOrApplyCompileFilter(std::vector<parse_func_t> &parse_items, const std::unique_ptr<node::Node> &schema, int ret, Args... args) {
     auto it = parse_items.begin();
-    if (filter) {
-        auto range = filterItems.equal_range(schema.get());
+    if (predicates) {
+        auto range =  predicates->getEqualRange(schema.get());
         if (range.first != range.second) {
             parse_items.emplace(it, ApplyType(ret, range.first, range.second, args...));
             return;
@@ -775,7 +638,6 @@ public:
     }
     int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
         const auto &value = TypeParser<T>::read(stream);
-        // tsv.addToPosition(value, position);
         for_each (
             start, end,
             [&value, &tsv, this](const auto& tsvItem){
@@ -861,7 +723,44 @@ private:
     int ret;
 };
 
+class ApplyTsvAsJson {
+public:
+    ApplyTsvAsJson(int ret,
+        dumper::TsvExpression::map_t::iterator start,
+        dumper::TsvExpression::map_t::iterator end,
+        BlockDecoder::const_node_t &schema,
+        BlockDecoder &decoder)
+        : ret(ret),
+          nodeType(schema),
+          decoder(decoder),
+          start(start),
+          end(end) {
+    }
+    int operator() (DeflatedBuffer &stream, dumper::Tsv &tsv) {
+        dumper::Json<dumper::JsonTag::plain> dumper;
 
+        decoder.dumpDocument(stream, nodeType, dumper);
+
+        const auto &value = dumper.GetAsString();
+
+        for_each (
+            start, end,
+            [&value, &tsv, this](const auto& tsvItem){
+                tsv.addToPosition(value, tsvItem.second);
+            }
+        );
+
+        return ret;
+
+    }
+
+private:
+    int ret;
+    BlockDecoder::const_node_t &nodeType;
+    BlockDecoder &decoder;
+    dumper::TsvExpression::map_t::iterator start;
+    dumper::TsvExpression::map_t::iterator end;
+};
 
 template <typename T>
 class ParseToTsvAdapter : public T {
@@ -954,21 +853,39 @@ int BlockDecoder::compileTsvExpression(std::vector<dump_tsv_func_t> &parse_items
     } else if (schema->is<node::Custom>()) {
         return compileTsvExpression(parse_items, schema->as<node::Custom>().getDefinition());
     } else if (schema->is<node::Record>()) {
-        auto &children = schema->as<node::Record>().getChildren();
-        size_t size = 0;
-        for(auto c = children.rbegin(); c != children.rend(); ++c) {
-            size += compileTsvExpression(parse_items, *c);
+        auto p = tsvFieldsList.what.equal_range(schema->getNumber());
+        if (p.first != p.second) {
+            auto it = parse_items.begin();
+            parse_items.emplace(it, ApplyTsvAsJson(elementsToSkip, p.first, p.second, schema, *this));
+            return 1;
+        } else {
+            auto &children = schema->as<node::Record>().getChildren();
+            size_t size = 0;
+            for(auto c = children.rbegin(); c != children.rend(); ++c) {
+                size += compileTsvExpression(parse_items, *c);
+            }
+            return size;
         }
-        return size;
+
     } else if (schema->is<node::Array>()) {
         //_deb(elementsToSkip, schema);
+        auto p = tsvFieldsList.what.equal_range(schema->getNumber());
         auto it = parse_items.begin();
-        parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+        if (p.first != p.second) {
+            parse_items.emplace(it, ApplyTsvAsJson(elementsToSkip, p.first, p.second, schema, *this));
+        } else {
+            parse_items.emplace(it, SkipArray(elementsToSkip, schema->as<node::Array>().getItemsType(), *this));
+        }
         return 1;
     } else if (schema->is<node::Map>()) {
         //_deb(elementsToSkip, schema);
+        auto p = tsvFieldsList.what.equal_range(schema->getNumber());
         auto it = parse_items.begin();
-        parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+        if (p.first != p.second) {
+            parse_items.emplace(it, ApplyTsvAsJson(elementsToSkip, p.first, p.second, schema, *this));
+        } else {
+            parse_items.emplace(it, SkipMap(elementsToSkip, schema->as<node::Map>().getItemsType(), *this));
+        }
         return 1;
     } else {
         if (schema->is<node::String>()) {
@@ -1114,14 +1031,14 @@ void BlockDecoder::dumpDocument(DeflatedBuffer &stream, const std::unique_ptr<no
 
 template <typename T>
 void BlockDecoder::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema) {
-    if (filter) {
-        auto range = filterItems.equal_range(schema.get());
+    if (predicates) {
+        auto range = predicates->getEqualRange(schema.get());
         if (range.first != range.second) {
             const auto &value = TypeParser<T>::read(stream);
             for_each (
                 range.first,
                 range.second,
-                [&value](const auto& filterItem){
+                [&value](const auto& filterItem) {
                     filterItem.second->template apply<T>(value);
                 }
             );
@@ -1129,14 +1046,6 @@ void BlockDecoder::skipOrApplyFilter(DeflatedBuffer &stream, const std::unique_p
         }
     }
     TypeParser<T>::skip(stream);
-}
-
-const node::Node* BlockDecoder::schemaNodeByPath(const std::string &path) {
-    auto n = node::nodeByPath(path, header.schema.get());
-    if (n == nullptr) {
-        throw PathNotFound(path);
-    }
-    return n;
 }
 
 

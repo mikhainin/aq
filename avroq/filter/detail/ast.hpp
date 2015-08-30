@@ -1,13 +1,5 @@
-//
-//  ast.hpp
-//  
-//
-//  Created by Mikhail Galanin on 26/04/15.
-//
-//
-
-#ifndef _ast_hpp
-#define _ast_hpp
+#ifndef __avroq_filter_detail_ast_hpp
+#define __avroq_filter_detail_ast_hpp
 
 #include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -16,10 +8,13 @@
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_function.hpp>
 
-#include "../nil.h"
-#include "../equality_expression.h"
+#include <filter/nil.h>
 
 namespace filter {
+
+struct record_expression;
+struct equality_expression;
+
 namespace detail {
 
 namespace qi = boost::spirit::qi;
@@ -39,6 +34,7 @@ struct expression_ast
           , int
           , std::string
           , boost::recursive_wrapper<equality_expression>
+          , boost::recursive_wrapper<record_expression>
           , boost::recursive_wrapper<expression_ast>
           , boost::recursive_wrapper<binary_op>
           , boost::recursive_wrapper<not_op>
