@@ -52,6 +52,11 @@ void FileEmitor::enableParseLoop() {
     parseLoopEnabled = true;
 }
 
+void FileEmitor::outputAsJson(bool pretty) {
+    jsonMode = true;
+    jsonPrettyMode = pretty;
+}
+
 std::shared_ptr<Task> FileEmitor::getNextTask(
     std::unique_ptr<avro::BlockDecoder> &decoder,
     size_t &fileId) {
@@ -123,6 +128,9 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
             );
         if (parseLoopEnabled) {
             decoder->enableParseLoop();
+        }
+        if (jsonMode) {
+            decoder->outputAsJson(jsonPrettyMode);
         }
         if (filter) {
             try {

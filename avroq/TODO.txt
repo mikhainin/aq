@@ -30,7 +30,6 @@ Long term TODO
 query JSON
 query protobuf
 print protobuf content
-display as JSON
 select fields to print (for non-TSV output)
 AVRO as output format
 

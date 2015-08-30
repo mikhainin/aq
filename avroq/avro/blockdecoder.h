@@ -48,6 +48,7 @@ public:
     void setCountMethod(std::function<void(size_t)> coutMethod);
     void enableCountOnlyMode();
     void enableParseLoop();
+    void outputAsJson(bool pretty);
 
 private:
     const struct header &header;
@@ -61,6 +62,8 @@ private:
     bool parseLoopEnabled = false;
     std::vector<parse_func_t> parseLoop;
     std::vector<dump_tsv_func_t> tsvDumpLoop;
+    bool jsonMode = false;
+    bool jsonPrettyMode = false;
 
     void decodeDocument(DeflatedBuffer &stream, const std::unique_ptr<node::Node> &schema);
 

@@ -3,8 +3,9 @@
 #include <filter/equality_expression.h>
 #include <filter/record_expression.h>
 
-#include "dumper/tsv.h"
 #include "dumper/fool.h"
+#include "dumper/json.h"
+#include "dumper/tsv.h"
 
 #include "node/all_nodes.h"
 
@@ -59,6 +60,13 @@ void BlockDecoder::enableCountOnlyMode() {
 
 void BlockDecoder::enableParseLoop() {
     parseLoopEnabled = true;
+}
+
+void BlockDecoder::outputAsJson(bool pretty) {
+    jsonMode = true;
+    if (pretty) {
+        jsonPrettyMode = true;
+    }
 }
 
 
@@ -123,6 +131,16 @@ void BlockDecoder::dumpDocument(Block &block) {
             dumpDocument(block.buffer, header.schema, dumper);
         }
         dumper.EndDocument(dumpMethod);
+    } else if (jsonMode) {
+        if (jsonPrettyMode) {
+            dumper::Json<dumper::JsonTag::pretty> dumper;
+            dumpDocument(block.buffer, header.schema, dumper);
+            dumper.EndDocument(dumpMethod);
+        } else {
+            dumper::Json<dumper::JsonTag::plain> dumper;
+            dumpDocument(block.buffer, header.schema, dumper);
+            dumper.EndDocument(dumpMethod);
+        }
     } else {
         dumper::Fool dumper;
         dumpDocument(block.buffer, header.schema, dumper);
