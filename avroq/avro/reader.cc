@@ -70,11 +70,6 @@ header Reader::readHeader() {
 
     }
 
-    SchemaReader schemaReader(header.metadata["avro.schema"]);
-    header.schema = schemaReader.parse();
-    header.nodesNumber = schemaReader.nodesNumber();
-    // dumpSchema(header.schema);
-    
     char c = d->input->getChar();
 
     assert(c == 0); // Avro Map is over, no more elements
@@ -83,6 +78,13 @@ header Reader::readHeader() {
 
     return header;
 
+}
+
+void Reader::parseSchema(header &header) {
+    SchemaReader schemaReader(header.metadata["avro.schema"]);
+    header.schema = schemaReader.parse();
+    header.nodesNumber = schemaReader.nodesNumber();
+    // dumpSchema(header.schema);
 }
 
 avro::StringBuffer Reader::nextBlock(const header &header, int64_t &objectCountInBlock ) {

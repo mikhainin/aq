@@ -55,7 +55,7 @@ void Worker::operator()() {
         	emitor.finished();
             break;
         } catch(const std::runtime_error &e) {
-            // TODO: stop processing completely
+        	emitor.finished();
             std::cerr << "Ooops! Something happened: " << e.what() << std::endl;
             break;
         }
