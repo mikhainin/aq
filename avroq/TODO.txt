@@ -4,7 +4,6 @@ print path to corrupted file
 
 v0.2
 ====
-display as JSON
 
 
 TODO

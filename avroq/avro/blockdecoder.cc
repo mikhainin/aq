@@ -103,9 +103,9 @@ void BlockDecoder::decodeAndDumpBlock(Block &block) {
 
             dumpDocument(block);
 
-            if(predicates) {
-                predicates->resetState();
-            }
+        }
+        if(predicates) {
+            predicates->resetState();
         }
     }
 

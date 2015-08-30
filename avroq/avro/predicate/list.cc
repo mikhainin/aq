@@ -364,6 +364,7 @@ const node::Node * List::unwrapCustom(const node::Node * node) {
     }
     return node;
 }
+
 const node::Node * List::notNullUnion(const node::Node * node) {
     while (node->is<node::Union>()) {
         for( auto &n : node->as<node::Union>().getChildren()) {
