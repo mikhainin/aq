@@ -53,7 +53,7 @@ header Reader::readHeader() {
     d->input->read(&magick[0], AVRO_MAGICK.size());
     
     if (magick != AVRO_MAGICK) {
-        throw std::runtime_error("Bad avro file (wrong magick)");
+        throw std::runtime_error("Bad avro file (wrong magick) on file " + d->file.fileName());
     }
 
     header header;
@@ -93,7 +93,7 @@ avro::StringBuffer Reader::nextBlock(const header &header, int64_t &objectCountI
     int64_t blockBytesNum = readZigZagLong(*d->input);
 
     if (blockBytesNum + SYNC_LENGTH > d->input->bytesLeft()) {
-        throw std::runtime_error("Corrupted file: next block supposed to have " +
+        throw std::runtime_error("Corrupted file (" + d->file.fileName() + "): next block supposed to have " +
             boost::lexical_cast<std::string>(blockBytesNum) + " bytes, but left: " +
             boost::lexical_cast<std::string>(d->input->bytesLeft()));
     }
@@ -104,7 +104,7 @@ avro::StringBuffer Reader::nextBlock(const header &header, int64_t &objectCountI
     d->input->read(&tmp_sync[0], sizeof tmp_sync); // TODO: move to a function
 
     if (std::memcmp(tmp_sync, header.sync, sizeof tmp_sync) != 0) {
-        throw std::runtime_error("Sync match failed");
+        throw std::runtime_error("Sync match failed on file" + d->file.fileName());
     }
 
     return result;

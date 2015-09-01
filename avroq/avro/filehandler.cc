@@ -16,7 +16,7 @@ FileException::FileException(const std::string &msg) : std::runtime_error(msg) {
 }
 
 
-FileHandle::FileHandle(const std::string &filename) {
+FileHandle::FileHandle(const std::string &filename) :filename(filename) {
 
     struct stat st;
     stat(filename.c_str(), &st);
@@ -40,6 +40,10 @@ FileHandle::~FileHandle() {
     if (fd != -1) {
         close(fd);
     }
+}
+
+const std::string &FileHandle::fileName() const {
+    return filename;
 }
 
 std::unique_ptr<StringBuffer> FileHandle::mmapFile() {

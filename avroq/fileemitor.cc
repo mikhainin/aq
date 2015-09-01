@@ -169,7 +169,7 @@ void FileEmitor::mainLoop() {
             std::cerr << "Processing " << currentFileName << std::endl;
         }
 
-        try{
+        try {
             currentTaskSample.reader.reset(new avro::Reader(currentFileName));
         } catch (const std::runtime_error &e) {
             std::cerr << e.what() << std::endl;

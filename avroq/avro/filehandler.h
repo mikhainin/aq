@@ -23,6 +23,8 @@ public:
 
     ~FileHandle();
 
+    const std::string &fileName() const;
+
     std::unique_ptr<StringBuffer> mmapFile();
 private:
     int fd = -1;
