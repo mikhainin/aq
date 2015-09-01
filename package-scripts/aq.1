@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH AQ 1 "JULY 2015" Aq "User Manuals"
+.TH aq 1 "JULY 2015" aq "User Manuals"
 .SH NAME
 aq \- avro files read & grep tool
 .SH SYNOPSIS
@@ -65,6 +65,11 @@ as fields separator in
 .B --fields
 parameter.
 
+.IP "--json"
+Output in JSON format (one record per line)
+
+.IP "--jp"
+Output in JSON format (prettified, many lines per record)
 
 .IP --disable-parse-loop
 Disable experimental parsing mode (enabled by default).
@@ -81,13 +86,13 @@ Display version and exit.
 boolean, double, enum, float, int, long, string, null (nil)
 
 .B Not yet supported for filtering:
-array, map, record
+map
 
 Supported operators: <, >, ==, ~=, >=, <=, and, or, not
 
 Supported string functions: contains(), starts_with(), ends_with()
 
-
+Special array indexes: all, any, none
 
 .SH EXAMPLES
 
@@ -100,6 +105,12 @@ $ aq -c 'impression_id == "49b3fc90-0db0-4396-8a2c-45a110e767b3"' *.avro
 $ aq -c 'timers.budget_time ~= nil' raw.avro
 
 $ aq -c 'timers.budget_time > 0.001' raw.avro --count-only -j3
+
+$ aq raw.avro -n 10000 -c 'log_files[none]:contains("no_bid")' -llog_files
+
+$ aq raw.avro -n1 -c 'log_files[any]:contains("bid_all")' 
+
+$ aq raw.avro -c 'http_request.uri == "/bsw_bid" and mongo_data[all](command_type == "find")'
 
 .SH AUTHOR
 Mikhail Galanin <mikhail.galanin@yahoo.com>, <mgalanin@iponweb.net>

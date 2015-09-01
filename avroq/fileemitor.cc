@@ -65,10 +65,6 @@ std::shared_ptr<Task> FileEmitor::getNextTask(
 
     std::shared_ptr<Task> task;
 
-    if (!queue.pop(task) || stop) {
-    	return std::shared_ptr<Task>();
-    }
-
     if (!queue.pop(task)) {
     	return std::shared_ptr<Task>();
     }
